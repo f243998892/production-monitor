@@ -283,6 +283,19 @@
                 </select>
             </div>
             
+            <!-- 添加工序选择下拉框 -->
+            <div class="filter-group">
+                <label for="processFilter">工序筛选</label>
+                <select id="processFilter">
+                    <option value="">全部工序</option>
+                    <option value="绕线">绕线</option>
+                    <option value="嵌线">嵌线</option>
+                    <option value="接线">接线</option>
+                    <option value="压装">压装</option>
+                    <option value="成品检验">成品检验</option>
+                </select>
+            </div>
+            
             <div class="filter-group">
                 <label for="searchInput">搜索</label>
                 <input type="text" id="searchInput" placeholder="输入关键字搜索...">
@@ -316,12 +329,6 @@
                 <input type="date" id="date-start" class="date-filter">
                 <span>至</span>
                 <input type="date" id="date-end" class="date-filter">
-            </div>
-            
-            <!-- 在filter-panel后面添加预计完成时间分析区域 -->
-            <div class="completion-analysis">
-                <h3>预计完成时间分析</h3>
-                <div id="completion-forecast"></div>
             </div>
         </div>
         
@@ -533,6 +540,7 @@
             // 筛选相关元素
             const modelFilter = document.getElementById('modelFilter');
             const seriesFilter = document.getElementById('seriesFilter');
+            const processFilter = document.getElementById('processFilter');
             const searchInput = document.getElementById('searchInput');
             const applyFiltersBtn = document.getElementById('applyFilters');
             const clearFiltersBtn = document.getElementById('clearFilters');
@@ -653,17 +661,12 @@
                     // 应用初始筛选并显示数据
                     applyFilters();
                     
-                    // 生成预计完成时间分析
-                    const completionForecasts = analyzeCompletionTime(products, modelSeries, seriesProcesses);
-                    displayCompletionForecast(completionForecasts);
-                    
                     // 保存数据，用于导出
                     window.exportData = {
                         products: products,
                         modelSeries: modelSeries,
                         seriesProcesses: seriesProcesses,
-                        modelStatistics: allStatistics,
-                        completionForecasts: completionForecasts
+                        modelStatistics: allStatistics
                     };
                     
                     // 隐藏加载中提示
@@ -719,6 +722,19 @@
                 // 生成统计结果
                 const statistics = [];
                 
+                // 所有可能的工序及其对应的时间字段
+                const allProcesses = ['绕线', '嵌线', '接线', '压装', '半成品检验', '浸漆', '车止口', '成品检验'];
+                const processTimeFields = {
+                    '绕线': '绕线时间',
+                    '嵌线': '嵌线时间',
+                    '接线': '接线时间',
+                    '压装': '压装时间',
+                    '半成品检验': '半成品检验时间',
+                    '浸漆': '浸漆时间',
+                    '车止口': '车止口时间',
+                    '成品检验': '成品检验时间'
+                };
+                
                 for (const model in productsByModel) {
                     const products = productsByModel[model];
                     const series = modelToSeries[model];
@@ -732,7 +748,9 @@
                             completedCount: 0,
                             totalCount: products.length,
                             completionRate: '0%',
-                            completionRateValue: 0 // 用于排序
+                            completionRateValue: 0, // 用于排序
+                            processCounts: {}, // 各工序完成数量
+                            processTimestamps: {} // 各工序的完成时间戳
                         });
                         continue;
                     }
@@ -740,18 +758,33 @@
                     // 获取工艺流程
                     const processes = seriesToProcesses[series];
                     
-                    // 计算完成最后一步的产品数量
-                    let completedCount = 0;
-                    
-                    products.forEach(product => {
-                        // 根据检验时间判断是否完成各工艺步骤
-                        // 这里简化处理，如果有成品检验时间，视为完成所有工艺
-                        if (product.成品检验时间) {
-                            completedCount++;
-                        }
+                    // 初始化各工序计数
+                    const processCounts = {};
+                    const processTimestamps = {};
+                    allProcesses.forEach(process => {
+                        processCounts[process] = 0;
+                        processTimestamps[process] = [];
                     });
                     
-                    // 计算完成率
+                    // 计算各工序完成数量
+                    products.forEach(product => {
+                        processes.forEach(process => {
+                            const timeField = processTimeFields[process];
+                            if (timeField && product[timeField]) {
+                                processCounts[process]++;
+                                
+                                // 存储完成时间戳
+                                processTimestamps[process].push({
+                                    timestamp: product[timeField],
+                                    productCode: product.产品编码
+                                });
+                            }
+                        });
+                    });
+                    
+                    // 计算完成率（以最后一道工序为准）
+                    const lastProcess = processes[processes.length - 1];
+                    const completedCount = processCounts[lastProcess] || 0;
                     const completionRateValue = products.length > 0 
                         ? (completedCount / products.length) * 100 
                         : 0;
@@ -765,7 +798,9 @@
                         completedCount,
                         totalCount: products.length,
                         completionRate,
-                        completionRateValue // 用于排序
+                        completionRateValue, // 用于排序
+                        processCounts, // 各工序完成数量
+                        processTimestamps // 各工序的完成时间戳
                     });
                 }
                 
@@ -812,29 +847,127 @@
             function applyFilters() {
                 const selectedModel = modelFilter.value;
                 const selectedSeries = seriesFilter.value;
+                const selectedProcess = processFilter.value;
                 const searchTerm = searchInput.value.toLowerCase().trim();
+                const startDate = document.getElementById('date-start').value 
+                    ? new Date(document.getElementById('date-start').value + 'T00:00:00') 
+                    : null;
+                const endDate = document.getElementById('date-end').value 
+                    ? new Date(document.getElementById('date-end').value + 'T23:59:59') 
+                    : null;
                 
-                // 应用筛选条件
-                filteredStatistics = allStatistics.filter(stat => {
-                    // 型号筛选
-                    if (selectedModel && stat.model !== selectedModel) {
-                        return false;
-                    }
+                // 根据当前活动的标签页应用不同的筛选
+                const activeTab = document.querySelector('.tab-button.active').getAttribute('data-tab');
+                
+                if (activeTab === 'products') {
+                    // 应用产品型号视图筛选条件
+                    // 对所有统计数据进行深拷贝，以防止修改原始数据
+                    const tempStatistics = JSON.parse(JSON.stringify(allStatistics));
                     
-                    // 工艺分类筛选
-                    if (selectedSeries && stat.series !== selectedSeries) {
-                        return false;
-                    }
-                    
-                    // 搜索筛选
-                    if (searchTerm) {
-                        const searchableText = `${stat.model} ${stat.series} ${stat.processes}`.toLowerCase();
-                        if (!searchableText.includes(searchTerm)) {
+                    // 筛选符合条件的型号统计
+                    filteredStatistics = tempStatistics.filter(stat => {
+                        // 型号筛选
+                        if (selectedModel && stat.model !== selectedModel) {
                             return false;
                         }
+                        
+                        // 工艺分类筛选
+                        if (selectedSeries && stat.series !== selectedSeries) {
+                            return false;
+                        }
+                        
+                        // 搜索筛选
+                        if (searchTerm) {
+                            const searchableText = `${stat.model} ${stat.series} ${stat.processes}`.toLowerCase();
+                            if (!searchableText.includes(searchTerm)) {
+                                return false;
+                            }
+                        }
+                        
+                        return true;
+                    });
+                    
+                    // 日期和工序筛选（修改完成数量和完成率）
+                    if ((startDate || endDate) && filteredStatistics.length > 0) {
+                        filteredStatistics.forEach(stat => {
+                            // 如果没有指定工序，则仍然使用最后一道工序统计完成数
+                            const processToCheck = selectedProcess || stat.processes.split(' -> ').pop();
+                            
+                            // 防止工序不存在
+                            if (!stat.processTimestamps[processToCheck]) {
+                                stat.completedCount = 0;
+                                stat.completionRate = '0%';
+                                stat.completionRateValue = 0;
+                                return;
+                            }
+                            
+                            // 筛选符合日期条件的完成记录
+                            const filteredTimestamps = stat.processTimestamps[processToCheck]
+                                .filter(item => {
+                                    const timestamp = new Date(item.timestamp);
+                                    return (!startDate || timestamp >= startDate) && 
+                                           (!endDate || timestamp <= endDate);
+                                });
+                            
+                            // 更新完成数量和完成率
+                            const dateFilteredCount = filteredTimestamps.length;
+                            stat.completedCount = dateFilteredCount;
+                            stat.completionRateValue = stat.totalCount > 0 
+                                ? (dateFilteredCount / stat.totalCount) * 100 
+                                : 0;
+                            stat.completionRate = stat.completionRateValue.toFixed(2) + '%';
+                            
+                            // 将工序筛选信息添加到显示中
+                            if (selectedProcess) {
+                                stat.processFilterInfo = `(筛选工序: ${processToCheck})`;
+                            } else {
+                                stat.processFilterInfo = '';
+                            }
+                        });
+                    } else if (selectedProcess && filteredStatistics.length > 0) {
+                        // 只有工序筛选而没有日期筛选的情况
+                        filteredStatistics.forEach(stat => {
+                            const completedCount = stat.processCounts[selectedProcess] || 0;
+                            stat.completedCount = completedCount;
+                            stat.completionRateValue = stat.totalCount > 0 
+                                ? (completedCount / stat.totalCount) * 100 
+                                : 0;
+                            stat.completionRate = stat.completionRateValue.toFixed(2) + '%';
+                            stat.processFilterInfo = `(筛选工序: ${selectedProcess})`;
+                        });
+                    } else {
+                        // 没有工序和日期筛选的情况，为显示添加空信息
+                        filteredStatistics.forEach(stat => {
+                            stat.processFilterInfo = '';
+                        });
                     }
                     
-                    return true;
+                    // 应用当前排序
+                    if (currentSort.column) {
+                        sortTableData(currentSort.column, currentSort.direction);
+                    }
+                    
+                    // 更新表格显示
+                    displayStatistics(filteredStatistics);
+                } else if (activeTab === 'employees') {
+                    // 应用员工视图筛选
+                    filterEmployeeStatistics(startDate, endDate, searchTerm, selectedProcess);
+                }
+            }
+            
+            // 清除筛选
+            function clearFilters() {
+                modelFilter.value = '';
+                seriesFilter.value = '';
+                processFilter.value = '';
+                searchInput.value = '';
+                document.getElementById('date-start').value = '';
+                document.getElementById('date-end').value = '';
+                
+                // 重置到所有数据
+                filteredStatistics = JSON.parse(JSON.stringify(allStatistics));
+                filteredStatistics.forEach(stat => {
+                    stat.processFilterInfo = '';
                 });
                 
                 // 应用当前排序
@@ -844,24 +977,12 @@
                 
                 // 更新表格显示
                 displayStatistics(filteredStatistics);
-            }
-            
-            // 清除筛选
-            function clearFilters() {
-                modelFilter.value = '';
-                seriesFilter.value = '';
-                searchInput.value = '';
                 
-                // 重置到所有数据
-                filteredStatistics = [...allStatistics];
-                
-                // 应用当前排序
-                if (currentSort.column) {
-                    sortTableData(currentSort.column, currentSort.direction);
+                // 如果员工标签页是活动的，重置员工视图
+                const activeTab = document.querySelector('.tab-button.active').getAttribute('data-tab');
+                if (activeTab === 'employees') {
+                    filterEmployeeStatistics(null, null, '', null);
                 }
-                
-                // 更新表格显示
-                displayStatistics(filteredStatistics);
             }
             
             // 排序表格
@@ -963,7 +1084,7 @@
                     row.innerHTML = `
                         <td>${stat.model}</td>
                         <td>${stat.series}</td>
-                        <td>${stat.completedCount}/${stat.totalCount}</td>
+                        <td>${stat.completedCount}/${stat.totalCount} ${stat.processFilterInfo || ''}</td>
                         <td>${stat.completionRate}</td>
                     `;
                     
@@ -983,7 +1104,6 @@
                 <button id="export-excel">导出Excel</button>
                 <div class="export-settings">
                     <label><input type="checkbox" class="export-checkbox" id="export-details" checked> 包含产品详情</label>
-                    <label><input type="checkbox" class="export-checkbox" id="export-analysis" checked> 包含完成时间分析</label>
                 </div>
             `;
             document.querySelector('.filter-panel').appendChild(exportGroup);
@@ -996,11 +1116,9 @@
                 }
                 
                 const includeDetails = document.getElementById('export-details').checked;
-                const includeAnalysis = document.getElementById('export-analysis').checked;
                 
                 exportToExcel(window.exportData, {
-                    includeDetails: includeDetails,
-                    includeAnalysis: includeAnalysis
+                    includeDetails: includeDetails
                 });
             });
             
@@ -1124,8 +1242,11 @@
                     }
                 });
                 
+                // 保存到全局变量供筛选使用
+                window.employeeData = employeeStats;
+                
                 // 转换为数组形式便于展示
-                const employeeData = Object.values(employeeStats).map(stat => {
+                const employeeDataArray = Object.values(employeeStats).map(stat => {
                     // 找出员工完成数量最多的工序
                     let mainProcess = '';
                     let maxCount = 0;
@@ -1143,7 +1264,7 @@
                         .join(', ');
                     
                     // 计算每天平均完成产品数（效率指数）
-                    const efficiency = calculateEfficiency(stat);
+                    const efficiency = calculateEfficiency(stat.timestamps);
                     
                     // 获取最近活动
                     let lastActive = '无记录';
@@ -1164,7 +1285,7 @@
                         processType: mainProcess,
                         processDetail: processDetail,
                         completedCount: stat.totalCompleted,
-                        efficiency: `${efficiency.toFixed(2)} 件/天`,
+                        efficiency: `${efficiency} 件/天`,
                         lastActive: lastActive,
                         // 存储原始数据，用于展示详情
                         rawData: stat
@@ -1172,10 +1293,10 @@
                 });
                 
                 // 按总完成数排序
-                employeeData.sort((a, b) => b.completedCount - a.completedCount);
+                employeeDataArray.sort((a, b) => b.completedCount - a.completedCount);
                 
                 // 显示员工数据
-                displayEmployeeStatistics(employeeData);
+                displayEmployeeStatistics(employeeDataArray);
                 
                 // 隐藏加载中
                 document.getElementById('loading').style.display = 'none';
@@ -1201,16 +1322,28 @@
         }
 
         // 计算员工效率（每天平均完成数量）
-        function calculateEfficiency(employeeData) {
-            // 获取最早和最晚的时间戳，计算工作天数
+        function calculateEfficiency(timestamps) {
+            if (!timestamps || timestamps.length === 0) return '0';
+            
+            // 找出最早和最晚的时间戳
             let earliestDate = null;
             let latestDate = null;
             
-            // 假设我们已经有了时间戳数据（实际应该从产品记录中提取）
-            // 这里简化处理，使用员工总完成数除以固定天数
-            const assumedWorkDays = 30; // 假设是一个月的工作日
+            timestamps.forEach(activity => {
+                const date = new Date(activity.time);
+                if (!earliestDate || date < earliestDate) {
+                    earliestDate = date;
+                }
+                if (!latestDate || date > latestDate) {
+                    latestDate = date;
+                }
+            });
             
-            return employeeData.totalCompleted / assumedWorkDays;
+            // 计算天数差异
+            const daysDiff = Math.max(1, Math.ceil((latestDate - earliestDate) / (1000 * 60 * 60 * 24)));
+            
+            // 计算日均产量
+            return (timestamps.length / daysDiff).toFixed(1);
         }
 
         // 显示员工统计数据
@@ -1341,218 +1474,11 @@
             document.body.appendChild(modalContainer);
         }
 
-        // 添加新函数 - 预计完成时间分析
-        function analyzeCompletionTime(products, modelSeries, seriesProcesses) {
-            const modelGroups = {};
-            const today = new Date();
-            
-            // 创建工艺分类到工序的映射
-            const seriesToProcesses = {};
-            seriesProcesses.forEach(item => {
-                const processList = [];
-                for (let i = 1; i <= 8; i++) {
-                    const processKey = `process_${i}`;
-                    if (item[processKey] && item[processKey].trim() !== '') {
-                        processList.push(item[processKey]);
-                    }
-                }
-                seriesToProcesses[item.工艺分类] = processList;
-            });
-            
-            // 创建型号到工艺分类的映射
-            const modelToSeries = {};
-            modelSeries.forEach(item => {
-                modelToSeries[item.产品型号] = item.工艺分类;
-            });
-            
-            // 按型号分组产品并计算进度
-            products.forEach(product => {
-                const model = product.产品型号;
-                if (!model) return; // 跳过没有型号的产品
-                
-                if (!modelGroups[model]) {
-                    modelGroups[model] = {
-                        total: 0,
-                        lastProcessCompleted: 0,  // 完成最后一道工序的数量
-                        processCounts: {},        // 每道工序完成的数量
-                        notStarted: 0,
-                        inProgress: 0,
-                        completed: 0,
-                        lastActivity: null,       // 最近的活动时间
-                        series: modelToSeries[model] || '未知'
-                    };
-                }
-                
-                const group = modelGroups[model];
-                group.total++;
-                
-                // 获取型号对应的工艺流程
-                const series = modelToSeries[model];
-                if (!series || !seriesToProcesses[series]) {
-                    group.notStarted++;
-                    return;
-                }
-                
-                const processes = seriesToProcesses[series];
-                let completedProcessCount = 0;
-                
-                // 计算产品完成的工序数量
-                processes.forEach((process, index) => {
-                    // 从product中找到对应的检验时间字段
-                    const timeField = `${process}时间`;
-                    if (product[timeField]) {
-                        completedProcessCount++;
-                        
-                        // 记录完成每道工序的数量
-                        if (!group.processCounts[process]) {
-                            group.processCounts[process] = 0;
-                        }
-                        group.processCounts[process]++;
-                        
-                        // 更新最近活动时间
-                        const activityTime = new Date(product[timeField]);
-                        if (!group.lastActivity || activityTime > group.lastActivity) {
-                            group.lastActivity = activityTime;
-                        }
-                    }
-                });
-                
-                // 判断产品状态
-                if (completedProcessCount === 0) {
-                    group.notStarted++;
-                } else if (completedProcessCount === processes.length) {
-                    group.completed++;
-                    group.lastProcessCompleted++;
-                } else {
-                    group.inProgress++;
-                }
-            });
-            
-            // 计算每个型号的预计完成时间
-            const forecasts = [];
-            Object.entries(modelGroups).forEach(([model, group]) => {
-                // 只分析有进行中产品的型号
-                if (group.inProgress === 0) {
-                    if (group.total > 0) {
-                        forecasts.push({
-                            model,
-                            series: group.series,
-                            total: group.total,
-                            completed: group.completed,
-                            inProgress: group.inProgress,
-                            notStarted: group.notStarted,
-                            lastProcessCompleted: group.lastProcessCompleted,
-                            estimatedDays: group.completed > 0 ? 0 : '未知',  // 所有产品已完成或未开始
-                            processCounts: group.processCounts,
-                            completionRate: group.total > 0 ? (group.completed / group.total * 100).toFixed(1) + '%' : '0%',
-                            status: 'completed'
-                        });
-                    }
-                    return;
-                }
-                
-                // 计算生产速率和预计完成时间
-                let estimatedDays = '未知';
-                let status = 'normal';
-                
-                if (group.lastActivity && group.completed > 0) {
-                    // 获取最近活动到现在的天数
-                    const daysSinceLastActivity = Math.max(1, Math.floor((today - group.lastActivity) / (1000 * 60 * 60 * 24)));
-                    
-                    // 计算平均每天完成的产品数量
-                    const avgCompletionPerDay = group.completed / daysSinceLastActivity;
-                    
-                    if (avgCompletionPerDay > 0) {
-                        // 计算完成剩余产品需要的天数
-                        estimatedDays = Math.ceil(group.inProgress / avgCompletionPerDay);
-                        
-                        // 设置状态
-                        if (estimatedDays > 14) {
-                            status = 'urgent';
-                        } else if (estimatedDays > 7) {
-                            status = 'delayed';
-                        }
-                    }
-                }
-                
-                forecasts.push({
-                    model,
-                    series: group.series,
-                    total: group.total,
-                    completed: group.completed,
-                    inProgress: group.inProgress,
-                    notStarted: group.notStarted,
-                    lastProcessCompleted: group.lastProcessCompleted,
-                    estimatedDays,
-                    processCounts: group.processCounts,
-                    completionRate: group.total > 0 ? (group.completed / group.total * 100).toFixed(1) + '%' : '0%',
-                    status
-                });
-            });
-            
-            // 按状态和预计完成时间排序
-            forecasts.sort((a, b) => {
-                // 首先按照状态优先级排序：urgent > delayed > normal > completed
-                const statusOrder = { urgent: 0, delayed: 1, normal: 2, completed: 3 };
-                const statusDiff = statusOrder[a.status] - statusOrder[b.status];
-                if (statusDiff !== 0) return statusDiff;
-                
-                // 如果状态相同，按照预计完成时间排序
-                if (a.estimatedDays === '未知' && b.estimatedDays === '未知') return 0;
-                if (a.estimatedDays === '未知') return 1;
-                if (b.estimatedDays === '未知') return -1;
-                return a.estimatedDays - b.estimatedDays;
-            });
-            
-            return forecasts;
-        }
-        
-        // 显示预计完成时间分析
-        function displayCompletionForecast(forecasts) {
-            const container = document.getElementById('completion-forecast');
-            if (!container) return;
-            
-            // 限制显示的型号数量，避免过多
-            const maxModelsToShow = 10;
-            const topForecasts = forecasts.slice(0, maxModelsToShow);
-            
-            // 生成HTML
-            let html = '';
-            topForecasts.forEach(forecast => {
-                const statusClass = forecast.status;
-                const daysText = forecast.estimatedDays === '未知' ? 
-                    '预计时间未知' : 
-                    (forecast.estimatedDays === 0 ? 
-                        '已全部完成' : 
-                        `预计完成还需 ${forecast.estimatedDays} 天`);
-                
-                html += `
-                    <div class="completion-card ${statusClass}">
-                        <strong>${forecast.model}</strong> (${forecast.series})<br>
-                        总数: ${forecast.total}件, 
-                        已完成: ${forecast.completed}件 (${forecast.completionRate}),
-                        最后工序完成: ${forecast.lastProcessCompleted}件<br>
-                        进行中: ${forecast.inProgress}件, 
-                        未开始: ${forecast.notStarted}件<br>
-                        ${daysText}
-                    </div>
-                `;
-            });
-            
-            // 如果型号超过显示限制，添加提示
-            if (forecasts.length > maxModelsToShow) {
-                html += `<div style="margin-top: 10px; font-style: italic;">还有 ${forecasts.length - maxModelsToShow} 个型号未显示</div>`;
-            }
-            
-            container.innerHTML = html;
-        }
-        
         // 增强Excel导出功能
         function exportToExcel(data, options = {}) {
             const defaultOptions = {
                 fileName: '产品生产进度_' + new Date().toISOString().split('T')[0],
-                includeDetails: true,
-                includeAnalysis: true
+                includeDetails: true
             };
             
             const exportOptions = { ...defaultOptions, ...options };
@@ -1588,32 +1514,6 @@
                 XLSX.utils.book_append_sheet(workbook, modelSheet, "型号统计");
             }
             
-            // 添加预计完成时间分析工作表
-            if (exportOptions.includeAnalysis && data.completionForecasts) {
-                const analysisData = data.completionForecasts.map(forecast => {
-                    return {
-                        '产品型号': forecast.model,
-                        '工艺分类': forecast.series,
-                        '总数量': forecast.total,
-                        '已完成数量': forecast.completed,
-                        '完成率': forecast.completionRate,
-                        '最后工序完成': forecast.lastProcessCompleted,
-                        '进行中数量': forecast.inProgress,
-                        '未开始数量': forecast.notStarted,
-                        '预计完成天数': typeof forecast.estimatedDays === 'number' ? forecast.estimatedDays : '未知',
-                        '状态': {
-                            'urgent': '紧急',
-                            'delayed': '延迟',
-                            'normal': '正常',
-                            'completed': '已完成'
-                        }[forecast.status] || '未知'
-                    };
-                });
-                
-                const analysisSheet = XLSX.utils.json_to_sheet(analysisData);
-                XLSX.utils.book_append_sheet(workbook, analysisSheet, "完成时间分析");
-            }
-            
             // 导出工作簿
             XLSX.writeFile(workbook, `${exportOptions.fileName}.xlsx`);
         }
@@ -1625,6 +1525,138 @@
                 cacheStatusEl.textContent = `缓存状态: ${message}`;
                 cacheStatusEl.style.color = "#666"; // 重置颜色
             }
+        }
+
+        // 添加员工视图筛选函数
+        function filterEmployeeStatistics(startDate, endDate, searchTerm, process) {
+            if (!window.employeeData) return;
+            
+            const filteredEmployees = {};
+            
+            // 遍历所有员工
+            Object.entries(window.employeeData).forEach(([employee, data]) => {
+                // 应用搜索筛选
+                if (searchTerm && !employee.toLowerCase().includes(searchTerm.toLowerCase())) {
+                    return;
+                }
+                
+                // 筛选符合条件的活动
+                let filteredTimestamps = [...data.timestamps];
+                
+                // 应用工序筛选
+                if (process) {
+                    filteredTimestamps = filteredTimestamps.filter(activity => 
+                        activity.process === process
+                    );
+                }
+                
+                // 应用日期筛选
+                if (startDate || endDate) {
+                    filteredTimestamps = filteredTimestamps.filter(activity => {
+                        const activityDate = new Date(activity.time);
+                        return (!startDate || activityDate >= startDate) && 
+                               (!endDate || activityDate <= endDate);
+                    });
+                }
+                
+                // 如果没有符合条件的活动，排除此员工
+                if (filteredTimestamps.length === 0) {
+                    return;
+                }
+                
+                // 创建此员工的筛选后数据
+                filteredEmployees[employee] = {
+                    ...data,
+                    timestamps: filteredTimestamps,
+                    // 重新计算此日期范围内的统计信息
+                    totalCount: filteredTimestamps.length,
+                    processTypes: countProcessTypes(filteredTimestamps)
+                };
+            });
+            
+            // 将对象转换为数组，与fetchEmployeeData函数中的处理方式相同
+            const employeeDataArray = Object.values(filteredEmployees).map(stat => {
+                // 找出员工完成数量最多的工序
+                let mainProcess = '';
+                let maxCount = 0;
+                
+                for (const [process, count] of Object.entries(stat.processTypes)) {
+                    if (count > maxCount) {
+                        maxCount = count;
+                        mainProcess = process;
+                    }
+                }
+                
+                // 创建工序详情
+                const processDetail = Object.entries(stat.processTypes)
+                    .map(([process, count]) => `${process}: ${count}`)
+                    .join(', ');
+                
+                // 计算每天平均完成产品数（效率指数）
+                const efficiency = calculateEfficiency(stat.timestamps);
+                
+                // 获取最近活动
+                let lastActive = '无记录';
+                if (stat.timestamps.length > 0) {
+                    // 按时间降序排序
+                    stat.timestamps.sort((a, b) => {
+                        return new Date(b.time) - new Date(a.time);
+                    });
+                    
+                    // 获取最近的活动
+                    const recentActivity = stat.timestamps[0];
+                    const activityDate = new Date(recentActivity.time);
+                    lastActive = `${activityDate.toLocaleDateString()} (${recentActivity.process})`;
+                }
+                
+                return {
+                    employee: stat.name,
+                    processType: mainProcess,
+                    processDetail: processDetail,
+                    completedCount: stat.totalCount,
+                    efficiency: `${efficiency} 件/天`,
+                    lastActive: lastActive,
+                    // 存储原始数据，用于展示详情
+                    rawData: stat
+                };
+            });
+            
+            // 按总完成数排序
+            employeeDataArray.sort((a, b) => b.completedCount - a.completedCount);
+            
+            // 更新员工表格，传递数组而不是对象
+            displayEmployeeStatistics(employeeDataArray);
+        }
+
+        // 辅助函数：计算工序类型数量
+        function countProcessTypes(timestamps) {
+            const counts = {};
+            timestamps.forEach(activity => {
+                counts[activity.process] = (counts[activity.process] || 0) + 1;
+            });
+            return counts;
+        }
+
+        // 修改标签页切换逻辑，添加筛选同步
+        function initTabs() {
+            const tabButtons = document.querySelectorAll('.tab-button');
+            const tabPanes = document.querySelectorAll('.tab-pane');
+            
+            tabButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    // 移除所有active类
+                    tabButtons.forEach(btn => btn.classList.remove('active'));
+                    tabPanes.forEach(pane => pane.classList.remove('active'));
+                    
+                    // 添加active类到当前按钮和对应面板
+                    this.classList.add('active');
+                    const tabName = this.getAttribute('data-tab');
+                    document.getElementById(`${tabName}-tab`).classList.add('active');
+                    
+                    // 应用筛选条件到新激活的标签页
+                    applyFilters();
+                });
+            });
         }
     </script>
 </body>
