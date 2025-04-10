@@ -10,9 +10,42 @@
             margin: 20px;
             line-height: 1.6;
         }
+
+        /* 响应式布局样式 */
         .container {
-            max-width: 1200px;
+            width: 100%;
+            max-width: 1400px;
             margin: 0 auto;
+            padding: 0 15px;
+        }
+
+        @media (max-width: 992px) {
+            .panel {
+                flex-direction: column;
+            }
+            .filter-panel, .data-panel {
+                width: 100%;
+                margin-right: 0;
+                margin-bottom: 20px;
+            }
+            table {
+                display: block;
+                overflow-x: auto;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .filter-form-row {
+                flex-direction: column;
+            }
+            .filter-form-group {
+                width: 100%;
+                margin-right: 0;
+                margin-bottom: 10px;
+            }
+            h1 {
+                font-size: 1.5rem;
+            }
         }
         h1 {
             color: #333;
@@ -158,7 +191,75 @@
             font-style: italic;
             margin-left: 10px;
         }
+        
+        /* 添加预计完成时间分析样式 */
+        .completion-analysis {
+            margin: 15px 0;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .completion-card {
+            display: inline-block;
+            padding: 10px 15px;
+            margin: 8px;
+            border-radius: 4px;
+            background-color: #e9ecef;
+            border-left: 4px solid #4CAF50;
+        }
+        .completion-card strong {
+            color: #333;
+        }
+        .completion-card.urgent {
+            border-left-color: #f44336;
+        }
+        .completion-card.delayed {
+            border-left-color: #ff9800;
+        }
+        .export-settings {
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .export-checkbox {
+            margin-right: 5px;
+        }
+        .cache-status {
+            margin-top: 10px;
+            font-size: 0.85em;
+            color: #666;
+            padding: 5px 10px;
+            background-color: #f5f5f5;
+            border-radius: 3px;
+            display: inline-block;
+        }
+        
+        /* 增强响应式布局 */
+        @media (max-width: 768px) {
+            .filter-panel {
+                flex-direction: column;
+            }
+            .filter-group {
+                margin-bottom: 10px;
+                width: 100%;
+            }
+            table {
+                font-size: 12px;
+            }
+            .completion-card {
+                width: 100%;
+                margin: 5px 0;
+            }
+            .export-settings {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
     </style>
+    <!-- 引入Excel导出库 -->
+    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -208,11 +309,26 @@
             <div class="filter-group">
                 <button id="saveRefreshSettings">保存刷新设置</button>
             </div>
+            
+            <!-- 新增日期范围筛选 -->
+            <div class="filter-item">
+                <label for="date-start">日期范围：</label>
+                <input type="date" id="date-start" class="date-filter">
+                <span>至</span>
+                <input type="date" id="date-end" class="date-filter">
+            </div>
+            
+            <!-- 在filter-panel后面添加预计完成时间分析区域 -->
+            <div class="completion-analysis">
+                <h3>预计完成时间分析</h3>
+                <div id="completion-forecast"></div>
+            </div>
         </div>
         
         <div class="status">
             <button id="refresh-btn">立即刷新</button>
             <span class="last-updated" id="last-updated">最后更新: -</span>
+            <div class="cache-status" id="cache-status">缓存状态: 未加载</div>
         </div>
         <div id="loading" class="loading">加载数据中...</div>
         <div id="statistics-container">
@@ -226,19 +342,19 @@
             <div class="tab-content">
                 <!-- 产品型号视图 -->
                 <div id="products-tab" class="tab-pane active">
-                    <table id="model-statistics">
-                        <thead>
-                            <tr>
+            <table id="model-statistics">
+                <thead>
+                    <tr>
                                 <th data-sort="model">产品型号</th>
                                 <th data-sort="series">工艺分类</th>
                                 <th data-sort="completedCount">完成数量</th>
                                 <th data-sort="completionRate">完成率</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <!-- 数据将通过JavaScript动态填充 -->
-                        </tbody>
-                    </table>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- 数据将通过JavaScript动态填充 -->
+                </tbody>
+            </table>
                 </div>
                 
                 <!-- 员工视图 -->
@@ -379,6 +495,21 @@
                 
                 // 更新最后获取时间
                 dataCache.lastFetch = new Date();
+                
+                // 添加缓存更新时间显示
+                if (dataCache.lastFetch && !forceRefresh) {
+                    const cacheTime = new Date(dataCache.lastFetch);
+                    const now = new Date();
+                    const diffMinutes = Math.floor((now - cacheTime) / (1000 * 60));
+                    
+                    updateCacheStatus(`使用${diffMinutes}分钟前的缓存数据`);
+                    
+                    // 如果缓存时间超过30分钟，提示用户刷新
+                    if (diffMinutes > 30) {
+                        console.log("缓存数据已超过30分钟，建议刷新");
+                        document.getElementById('cache-status').style.color = "#ff9800";
+                    }
+                }
                 
                 return result;
             } catch (error) {
@@ -522,12 +653,28 @@
                     // 应用初始筛选并显示数据
                     applyFilters();
                     
+                    // 生成预计完成时间分析
+                    const completionForecasts = analyzeCompletionTime(products, modelSeries, seriesProcesses);
+                    displayCompletionForecast(completionForecasts);
+                    
+                    // 保存数据，用于导出
+                    window.exportData = {
+                        products: products,
+                        modelSeries: modelSeries,
+                        seriesProcesses: seriesProcesses,
+                        modelStatistics: allStatistics,
+                        completionForecasts: completionForecasts
+                    };
+                    
                     // 隐藏加载中提示
                     loadingDiv.style.display = 'none';
                     
                     // 更新最后刷新时间
                     const now = new Date();
                     lastUpdatedSpan.textContent = `最后更新: ${now.toLocaleString()}`;
+                    
+                    // 更新缓存状态
+                    updateCacheStatus(`数据已刷新: ${new Date().toLocaleTimeString()}`);
                 } catch (error) {
                     console.error('获取数据出错:', error);
                     loadingDiv.textContent = `加载失败: ${error.message}`;
@@ -828,6 +975,41 @@
 
             // 页面加载完成后立即获取数据
             fetchProductionData();
+            
+            // 添加Excel导出按钮到筛选面板
+            const exportGroup = document.createElement('div');
+            exportGroup.className = 'filter-group';
+            exportGroup.innerHTML = `
+                <button id="export-excel">导出Excel</button>
+                <div class="export-settings">
+                    <label><input type="checkbox" class="export-checkbox" id="export-details" checked> 包含产品详情</label>
+                    <label><input type="checkbox" class="export-checkbox" id="export-analysis" checked> 包含完成时间分析</label>
+                </div>
+            `;
+            document.querySelector('.filter-panel').appendChild(exportGroup);
+            
+            // 绑定Excel导出事件
+            document.getElementById('export-excel').addEventListener('click', function() {
+                if (!window.exportData) {
+                    alert('没有可用的数据进行导出');
+                    return;
+                }
+                
+                const includeDetails = document.getElementById('export-details').checked;
+                const includeAnalysis = document.getElementById('export-analysis').checked;
+                
+                exportToExcel(window.exportData, {
+                    includeDetails: includeDetails,
+                    includeAnalysis: includeAnalysis
+                });
+            });
+            
+            // 从localStorage恢复刷新设置
+            const savedInterval = localStorage.getItem('refreshInterval');
+            if (savedInterval) {
+                refreshIntervalSelect.value = savedInterval;
+                updateRefreshInterval();
+            }
         };
 
         // 加载并初始化应用
@@ -1157,6 +1339,292 @@
             
             modalContainer.appendChild(modalContent);
             document.body.appendChild(modalContainer);
+        }
+
+        // 添加新函数 - 预计完成时间分析
+        function analyzeCompletionTime(products, modelSeries, seriesProcesses) {
+            const modelGroups = {};
+            const today = new Date();
+            
+            // 创建工艺分类到工序的映射
+            const seriesToProcesses = {};
+            seriesProcesses.forEach(item => {
+                const processList = [];
+                for (let i = 1; i <= 8; i++) {
+                    const processKey = `process_${i}`;
+                    if (item[processKey] && item[processKey].trim() !== '') {
+                        processList.push(item[processKey]);
+                    }
+                }
+                seriesToProcesses[item.工艺分类] = processList;
+            });
+            
+            // 创建型号到工艺分类的映射
+            const modelToSeries = {};
+            modelSeries.forEach(item => {
+                modelToSeries[item.产品型号] = item.工艺分类;
+            });
+            
+            // 按型号分组产品并计算进度
+            products.forEach(product => {
+                const model = product.产品型号;
+                if (!model) return; // 跳过没有型号的产品
+                
+                if (!modelGroups[model]) {
+                    modelGroups[model] = {
+                        total: 0,
+                        lastProcessCompleted: 0,  // 完成最后一道工序的数量
+                        processCounts: {},        // 每道工序完成的数量
+                        notStarted: 0,
+                        inProgress: 0,
+                        completed: 0,
+                        lastActivity: null,       // 最近的活动时间
+                        series: modelToSeries[model] || '未知'
+                    };
+                }
+                
+                const group = modelGroups[model];
+                group.total++;
+                
+                // 获取型号对应的工艺流程
+                const series = modelToSeries[model];
+                if (!series || !seriesToProcesses[series]) {
+                    group.notStarted++;
+                    return;
+                }
+                
+                const processes = seriesToProcesses[series];
+                let completedProcessCount = 0;
+                
+                // 计算产品完成的工序数量
+                processes.forEach((process, index) => {
+                    // 从product中找到对应的检验时间字段
+                    const timeField = `${process}时间`;
+                    if (product[timeField]) {
+                        completedProcessCount++;
+                        
+                        // 记录完成每道工序的数量
+                        if (!group.processCounts[process]) {
+                            group.processCounts[process] = 0;
+                        }
+                        group.processCounts[process]++;
+                        
+                        // 更新最近活动时间
+                        const activityTime = new Date(product[timeField]);
+                        if (!group.lastActivity || activityTime > group.lastActivity) {
+                            group.lastActivity = activityTime;
+                        }
+                    }
+                });
+                
+                // 判断产品状态
+                if (completedProcessCount === 0) {
+                    group.notStarted++;
+                } else if (completedProcessCount === processes.length) {
+                    group.completed++;
+                    group.lastProcessCompleted++;
+                } else {
+                    group.inProgress++;
+                }
+            });
+            
+            // 计算每个型号的预计完成时间
+            const forecasts = [];
+            Object.entries(modelGroups).forEach(([model, group]) => {
+                // 只分析有进行中产品的型号
+                if (group.inProgress === 0) {
+                    if (group.total > 0) {
+                        forecasts.push({
+                            model,
+                            series: group.series,
+                            total: group.total,
+                            completed: group.completed,
+                            inProgress: group.inProgress,
+                            notStarted: group.notStarted,
+                            lastProcessCompleted: group.lastProcessCompleted,
+                            estimatedDays: group.completed > 0 ? 0 : '未知',  // 所有产品已完成或未开始
+                            processCounts: group.processCounts,
+                            completionRate: group.total > 0 ? (group.completed / group.total * 100).toFixed(1) + '%' : '0%',
+                            status: 'completed'
+                        });
+                    }
+                    return;
+                }
+                
+                // 计算生产速率和预计完成时间
+                let estimatedDays = '未知';
+                let status = 'normal';
+                
+                if (group.lastActivity && group.completed > 0) {
+                    // 获取最近活动到现在的天数
+                    const daysSinceLastActivity = Math.max(1, Math.floor((today - group.lastActivity) / (1000 * 60 * 60 * 24)));
+                    
+                    // 计算平均每天完成的产品数量
+                    const avgCompletionPerDay = group.completed / daysSinceLastActivity;
+                    
+                    if (avgCompletionPerDay > 0) {
+                        // 计算完成剩余产品需要的天数
+                        estimatedDays = Math.ceil(group.inProgress / avgCompletionPerDay);
+                        
+                        // 设置状态
+                        if (estimatedDays > 14) {
+                            status = 'urgent';
+                        } else if (estimatedDays > 7) {
+                            status = 'delayed';
+                        }
+                    }
+                }
+                
+                forecasts.push({
+                    model,
+                    series: group.series,
+                    total: group.total,
+                    completed: group.completed,
+                    inProgress: group.inProgress,
+                    notStarted: group.notStarted,
+                    lastProcessCompleted: group.lastProcessCompleted,
+                    estimatedDays,
+                    processCounts: group.processCounts,
+                    completionRate: group.total > 0 ? (group.completed / group.total * 100).toFixed(1) + '%' : '0%',
+                    status
+                });
+            });
+            
+            // 按状态和预计完成时间排序
+            forecasts.sort((a, b) => {
+                // 首先按照状态优先级排序：urgent > delayed > normal > completed
+                const statusOrder = { urgent: 0, delayed: 1, normal: 2, completed: 3 };
+                const statusDiff = statusOrder[a.status] - statusOrder[b.status];
+                if (statusDiff !== 0) return statusDiff;
+                
+                // 如果状态相同，按照预计完成时间排序
+                if (a.estimatedDays === '未知' && b.estimatedDays === '未知') return 0;
+                if (a.estimatedDays === '未知') return 1;
+                if (b.estimatedDays === '未知') return -1;
+                return a.estimatedDays - b.estimatedDays;
+            });
+            
+            return forecasts;
+        }
+        
+        // 显示预计完成时间分析
+        function displayCompletionForecast(forecasts) {
+            const container = document.getElementById('completion-forecast');
+            if (!container) return;
+            
+            // 限制显示的型号数量，避免过多
+            const maxModelsToShow = 10;
+            const topForecasts = forecasts.slice(0, maxModelsToShow);
+            
+            // 生成HTML
+            let html = '';
+            topForecasts.forEach(forecast => {
+                const statusClass = forecast.status;
+                const daysText = forecast.estimatedDays === '未知' ? 
+                    '预计时间未知' : 
+                    (forecast.estimatedDays === 0 ? 
+                        '已全部完成' : 
+                        `预计完成还需 ${forecast.estimatedDays} 天`);
+                
+                html += `
+                    <div class="completion-card ${statusClass}">
+                        <strong>${forecast.model}</strong> (${forecast.series})<br>
+                        总数: ${forecast.total}件, 
+                        已完成: ${forecast.completed}件 (${forecast.completionRate}),
+                        最后工序完成: ${forecast.lastProcessCompleted}件<br>
+                        进行中: ${forecast.inProgress}件, 
+                        未开始: ${forecast.notStarted}件<br>
+                        ${daysText}
+                    </div>
+                `;
+            });
+            
+            // 如果型号超过显示限制，添加提示
+            if (forecasts.length > maxModelsToShow) {
+                html += `<div style="margin-top: 10px; font-style: italic;">还有 ${forecasts.length - maxModelsToShow} 个型号未显示</div>`;
+            }
+            
+            container.innerHTML = html;
+        }
+        
+        // 增强Excel导出功能
+        function exportToExcel(data, options = {}) {
+            const defaultOptions = {
+                fileName: '产品生产进度_' + new Date().toISOString().split('T')[0],
+                includeDetails: true,
+                includeAnalysis: true
+            };
+            
+            const exportOptions = { ...defaultOptions, ...options };
+            
+            // 创建一个新的工作簿
+            const workbook = XLSX.utils.book_new();
+            
+            // 准备数据
+            if (exportOptions.includeDetails && data.products) {
+                // 产品详情工作表
+                const productDetails = data.products.map(product => {
+                    // 提取需要的字段，简化数据
+                    return {
+                        '产品编码': product.产品编码,
+                        '产品型号': product.产品型号,
+                        '工艺分类': data.modelSeries?.find(m => m.产品型号 === product.产品型号)?.工艺分类 || '未知',
+                        '绕线时间': product.绕线时间 ? new Date(product.绕线时间).toLocaleString() : '',
+                        '嵌线时间': product.嵌线时间 ? new Date(product.嵌线时间).toLocaleString() : '',
+                        '接线时间': product.接线时间 ? new Date(product.接线时间).toLocaleString() : '',
+                        '压装时间': product.压装时间 ? new Date(product.压装时间).toLocaleString() : '',
+                        '成品检验时间': product.成品检验时间 ? new Date(product.成品检验时间).toLocaleString() : '',
+                        '创建时间': product.created_at ? new Date(product.created_at).toLocaleString() : ''
+                    };
+                });
+                
+                const productSheet = XLSX.utils.json_to_sheet(productDetails);
+                XLSX.utils.book_append_sheet(workbook, productSheet, "产品详情");
+            }
+            
+            // 添加型号统计工作表
+            if (data.modelStatistics) {
+                const modelSheet = XLSX.utils.json_to_sheet(data.modelStatistics);
+                XLSX.utils.book_append_sheet(workbook, modelSheet, "型号统计");
+            }
+            
+            // 添加预计完成时间分析工作表
+            if (exportOptions.includeAnalysis && data.completionForecasts) {
+                const analysisData = data.completionForecasts.map(forecast => {
+                    return {
+                        '产品型号': forecast.model,
+                        '工艺分类': forecast.series,
+                        '总数量': forecast.total,
+                        '已完成数量': forecast.completed,
+                        '完成率': forecast.completionRate,
+                        '最后工序完成': forecast.lastProcessCompleted,
+                        '进行中数量': forecast.inProgress,
+                        '未开始数量': forecast.notStarted,
+                        '预计完成天数': typeof forecast.estimatedDays === 'number' ? forecast.estimatedDays : '未知',
+                        '状态': {
+                            'urgent': '紧急',
+                            'delayed': '延迟',
+                            'normal': '正常',
+                            'completed': '已完成'
+                        }[forecast.status] || '未知'
+                    };
+                });
+                
+                const analysisSheet = XLSX.utils.json_to_sheet(analysisData);
+                XLSX.utils.book_append_sheet(workbook, analysisSheet, "完成时间分析");
+            }
+            
+            // 导出工作簿
+            XLSX.writeFile(workbook, `${exportOptions.fileName}.xlsx`);
+        }
+        
+        // 添加更新缓存状态的函数
+        function updateCacheStatus(message) {
+            const cacheStatusEl = document.getElementById('cache-status');
+            if (cacheStatusEl) {
+                cacheStatusEl.textContent = `缓存状态: ${message}`;
+                cacheStatusEl.style.color = "#666"; // 重置颜色
+            }
         }
     </script>
 </body>
