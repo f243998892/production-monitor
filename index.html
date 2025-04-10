@@ -31,6 +31,18 @@
         }
         th {
             background-color: #f8f8f8;
+            cursor: pointer; /* 添加指针样式，表示可点击排序 */
+        }
+        th:hover {
+            background-color: #e8e8e8; /* 鼠标悬停效果 */
+        }
+        th.sorted-asc::after {
+            content: " ↑";
+            color: #4CAF50;
+        }
+        th.sorted-desc::after {
+            content: " ↓";
+            color: #4CAF50;
         }
         tr:nth-child(even) {
             background-color: #f2f2f2;
@@ -64,31 +76,190 @@
             color: red;
             font-weight: bold;
         }
+        
+        /* 筛选面板样式 */
+        .filter-panel {
+            background-color: #f8f8f8;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+        }
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            min-width: 200px;
+        }
+        .filter-group label {
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        .filter-group select, .filter-group input {
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        #searchInput {
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            width: 100%;
+            max-width: 300px;
+        }
+        .clearFilters {
+            background-color: #f44336;
+        }
+        .clearFilters:hover {
+            background-color: #d32f2f;
+        }
+        
+        /* 标签页样式 */
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .tab-button {
+            padding: 10px 20px;
+            background-color: #f8f8f8;
+            border: 1px solid #ddd;
+            border-bottom: none;
+            border-radius: 4px 4px 0 0;
+            margin-right: 5px;
+            cursor: pointer;
+        }
+        
+        .tab-button:hover {
+            background-color: #e8e8e8;
+        }
+        
+        .tab-button.active {
+            background-color: #4CAF50;
+            color: white;
+            border-color: #4CAF50;
+        }
+        
+        .tab-pane {
+            display: none;
+        }
+        
+        .tab-pane.active {
+            display: block;
+        }
+        
+        /* 刷新状态显示 */
+        #refreshStatus {
+            color: #666;
+            font-style: italic;
+            margin-left: 10px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>产品生产进度监控</h1>
+        
+        <!-- 筛选面板 -->
+        <div class="filter-panel">
+            <div class="filter-group">
+                <label for="modelFilter">产品型号</label>
+                <select id="modelFilter">
+                    <option value="">全部型号</option>
+                    <!-- 将通过JS动态填充 -->
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label for="seriesFilter">工艺分类</label>
+                <select id="seriesFilter">
+                    <option value="">全部分类</option>
+                    <!-- 将通过JS动态填充 -->
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label for="searchInput">搜索</label>
+                <input type="text" id="searchInput" placeholder="输入关键字搜索...">
+            </div>
+            
+            <div class="filter-group">
+                <button id="applyFilters">应用筛选</button>
+                <button id="clearFilters" class="clearFilters">清除筛选</button>
+            </div>
+            
+            <!-- 刷新设置 -->
+            <div class="filter-group">
+                <label for="refreshInterval">自动刷新频率</label>
+                <select id="refreshInterval">
+                    <option value="0">关闭自动刷新</option>
+                    <option value="30">30秒</option>
+                    <option value="60" selected>1分钟</option>
+                    <option value="300">5分钟</option>
+                    <option value="600">10分钟</option>
+                    <option value="1800">30分钟</option>
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <button id="saveRefreshSettings">保存刷新设置</button>
+            </div>
+        </div>
+        
         <div class="status">
             <button id="refresh-btn">立即刷新</button>
             <span class="last-updated" id="last-updated">最后更新: -</span>
         </div>
         <div id="loading" class="loading">加载数据中...</div>
         <div id="statistics-container">
-            <table id="model-statistics">
-                <thead>
-                    <tr>
-                        <th>产品型号</th>
-                        <th>工艺分类</th>
-                        <th>流程步骤</th>
-                        <th>完成数量</th>
-                        <th>完成率</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- 数据将通过JavaScript动态填充 -->
-                </tbody>
-            </table>
+            <!-- 标签页导航 -->
+            <div class="tabs">
+                <button class="tab-button active" data-tab="products">产品型号视图</button>
+                <button class="tab-button" data-tab="employees">员工视图</button>
+            </div>
+            
+            <!-- 标签页内容 -->
+            <div class="tab-content">
+                <!-- 产品型号视图 -->
+                <div id="products-tab" class="tab-pane active">
+                    <table id="model-statistics">
+                        <thead>
+                            <tr>
+                                <th data-sort="model">产品型号</th>
+                                <th data-sort="series">工艺分类</th>
+                                <th data-sort="completedCount">完成数量</th>
+                                <th data-sort="completionRate">完成率</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- 数据将通过JavaScript动态填充 -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- 员工视图 -->
+                <div id="employees-tab" class="tab-pane">
+                    <table id="employee-statistics">
+                        <thead>
+                            <tr>
+                                <th data-sort="employee">员工姓名</th>
+                                <th data-sort="processType">主要工序</th>
+                                <th data-sort="processDetail">工序完成详情</th>
+                                <th data-sort="completedCount">完成总数</th>
+                                <th data-sort="efficiency">日均产量</th>
+                                <th data-sort="lastActive">最近活动</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- 动态填充 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -97,102 +268,259 @@
     
     <!-- 将所有代码整合在一个文件中，避免引用问题 -->
     <script>
-        // 等待页面完全加载
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log("页面加载完成，初始化应用...");
-            
-            // 初始化Supabase客户端
+        // 全局缓存变量，用于存储已获取的数据
+        let dataCache = {
+            modelSeries: null,
+            seriesProcesses: null,
+            products: null,
+            lastFetch: null
+        };
+
+        // 优化的数据获取函数，支持缓存和选择性获取
+        async function fetchSupabaseData(tables = ['modelSeries', 'seriesProcesses', 'products'], forceRefresh = false) {
             const SUPABASE_URL = "https://mirilhunybcsydhtowqo.supabase.co";
             const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1pcmlsaHVueWJjc3lkaHRvd3FvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDEyNjk3MzEsImV4cCI6MjA1Njg0NTczMX0.fQCOraXJXQFshRXxHf2N-VIwTSbEc1hrxXzHP4sIIAw";
+            const headers = {
+                'apikey': SUPABASE_KEY,
+                'Authorization': `Bearer ${SUPABASE_KEY}`
+            };
             
-            // 使用全局的supabase对象
-            const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-            console.log("Supabase已初始化");
+            // 如果有缓存且未强制刷新，则使用缓存
+            if (dataCache.lastFetch && !forceRefresh) {
+                console.log("使用缓存数据...");
+                
+                // 过滤出需要获取的表
+                const result = {};
+                tables.forEach(table => {
+                    if (dataCache[table]) {
+                        result[table] = dataCache[table];
+                    }
+                });
+                
+                // 如果所有请求的表都有缓存，直接返回
+                if (Object.keys(result).length === tables.length) {
+                    console.log("所有请求的表都有缓存数据");
+                    return result;
+                }
+            }
+            
+            console.log("获取数据中...");
+            const result = {};
+            
+            try {
+                // 获取model_series数据
+                if (tables.includes('modelSeries') && (!dataCache.modelSeries || forceRefresh)) {
+                    console.log("获取model_series数据...");
+                    const modelSeriesResponse = await fetch(`${SUPABASE_URL}/rest/v1/model_series?select=*`, { headers });
+                    const modelSeries = await modelSeriesResponse.json();
+                    result.modelSeries = modelSeries;
+                    dataCache.modelSeries = modelSeries;
+                    console.log(`获取到${modelSeries?.length || 0}条model_series数据`);
+                } else if (tables.includes('modelSeries')) {
+                    result.modelSeries = dataCache.modelSeries;
+                }
+                
+                // 获取series_processes数据
+                if (tables.includes('seriesProcesses') && (!dataCache.seriesProcesses || forceRefresh)) {
+                    console.log("获取series_processes数据...");
+                    const seriesProcessesResponse = await fetch(`${SUPABASE_URL}/rest/v1/series_processes?select=*`, { headers });
+                    const seriesProcesses = await seriesProcessesResponse.json();
+                    result.seriesProcesses = seriesProcesses;
+                    dataCache.seriesProcesses = seriesProcesses;
+                    console.log(`获取到${seriesProcesses?.length || 0}条series_processes数据`);
+                } else if (tables.includes('seriesProcesses')) {
+                    result.seriesProcesses = dataCache.seriesProcesses;
+                }
+                
+                // 分页获取products数据
+                if (tables.includes('products') && (!dataCache.products || forceRefresh)) {
+                    console.log("获取products数据...");
+                    let allProducts = [];
+                    let page = 0;
+                    const pageSize = 1000;
+                    let hasMore = true;
+                    
+                    while (hasMore) {
+                        const offset = page * pageSize;
+                        console.log(`获取products数据，页码: ${page+1}，偏移量: ${offset}`);
+                        
+                        try {
+                            const productsResponse = await fetch(
+                                `${SUPABASE_URL}/rest/v1/products?select=*&limit=${pageSize}&offset=${offset}`, 
+                                { headers }
+                            );
+                            
+                            if (!productsResponse.ok) {
+                                throw new Error(`获取products失败: ${productsResponse.statusText}`);
+                            }
+                            
+                            const products = await productsResponse.json();
+                            
+                            if (products.length === 0) {
+                                hasMore = false;
+                            } else {
+                                allProducts = allProducts.concat(products);
+                                page++;
+                                // 显示进度提示
+                                document.getElementById('loading').textContent = `已加载 ${allProducts.length} 条产品数据...`;
+                            }
+                        } catch (error) {
+                            console.error(`获取products页码${page+1}失败:`, error);
+                            hasMore = false;
+                        }
+                    }
+                    
+                    console.log(`总共获取到 ${allProducts.length} 条产品数据`);
+                    result.products = allProducts;
+                    dataCache.products = allProducts;
+                } else if (tables.includes('products')) {
+                    result.products = dataCache.products;
+                }
+                
+                // 更新最后获取时间
+                dataCache.lastFetch = new Date();
+                
+                return result;
+            } catch (error) {
+                console.error("获取数据失败:", error);
+                throw error;
+            }
+        }
+        
+        // 延迟初始化应用
+        window.initializeApp = function() {
+            // 应用初始化代码
+            console.log("页面加载完成，初始化应用...");
             
             // 定义DOM元素
             const refreshBtn = document.getElementById('refresh-btn');
             const lastUpdatedSpan = document.getElementById('last-updated');
             const loadingDiv = document.getElementById('loading');
             const statisticsTable = document.getElementById('model-statistics').querySelector('tbody');
+            const tableHeader = document.getElementById('model-statistics').querySelector('thead');
+            
+            // 筛选相关元素
+            const modelFilter = document.getElementById('modelFilter');
+            const seriesFilter = document.getElementById('seriesFilter');
+            const searchInput = document.getElementById('searchInput');
+            const applyFiltersBtn = document.getElementById('applyFilters');
+            const clearFiltersBtn = document.getElementById('clearFilters');
+            
+            // 存储所有数据和筛选后的数据
+            let allStatistics = [];
+            let filteredStatistics = [];
+            
+            // 存储当前排序状态
+            let currentSort = {
+                column: '',
+                direction: 'asc'
+            };
 
             // 刷新按钮点击事件
             refreshBtn.addEventListener('click', function() {
-                fetchProductionData();
+                fetchProductionData(true); // 强制刷新
+            });
+            
+            // 应用筛选按钮点击事件
+            applyFiltersBtn.addEventListener('click', function() {
+                applyFilters();
+            });
+            
+            // 清除筛选按钮点击事件
+            clearFiltersBtn.addEventListener('click', function() {
+                clearFilters();
+            });
+            
+            // 搜索框输入事件
+            searchInput.addEventListener('input', function() {
+                applyFilters();
+            });
+            
+            // 设置表头排序事件
+            tableHeader.querySelectorAll('th').forEach(headerCell => {
+                headerCell.addEventListener('click', () => {
+                    const sortColumn = headerCell.getAttribute('data-sort');
+                    if (sortColumn) {
+                        sortTable(sortColumn);
+                    }
+                });
             });
 
+            // 刷新相关变量和函数
+            let refreshIntervalId = null;
+            const refreshIntervalSelect = document.getElementById('refreshInterval');
+            const saveRefreshSettingsBtn = document.getElementById('saveRefreshSettings');
+            
+            // 创建和添加刷新状态元素
+            const refreshStatusSpan = document.createElement('span');
+            refreshStatusSpan.id = 'refreshStatus';
+            refreshStatusSpan.textContent = '自动刷新未设置';
+            document.querySelector('.status').appendChild(refreshStatusSpan);
+
+            // 保存刷新设置
+            saveRefreshSettingsBtn.addEventListener('click', function() {
+                updateRefreshInterval();
+            });
+
+            function updateRefreshInterval() {
+                // 清除现有的定时器
+                if (refreshIntervalId) {
+                    clearInterval(refreshIntervalId);
+                    refreshIntervalId = null;
+                }
+                
+                // 获取选定的刷新间隔（秒）
+                const intervalSeconds = parseInt(refreshIntervalSelect.value);
+                
+                // 设置新的定时器（如果间隔不为0）
+                if (intervalSeconds > 0) {
+                    refreshIntervalId = setInterval(() => fetchProductionData(true), intervalSeconds * 1000);
+                    console.log(`已设置自动刷新，频率为 ${intervalSeconds} 秒`);
+                    
+                    // 更新状态显示
+                    document.getElementById('refreshStatus').textContent = 
+                        `自动刷新已启用: 每 ${intervalSeconds} 秒`;
+                } else {
+                    // 更新状态显示
+                    document.getElementById('refreshStatus').textContent = '自动刷新已关闭';
+                    console.log('自动刷新已关闭');
+                }
+            }
+
             // 从Supabase获取数据并处理
-            async function fetchProductionData() {
+            async function fetchProductionData(forceRefresh = false) {
                 try {
                     console.log("开始获取数据...");
                     // 显示加载中
                     loadingDiv.style.display = 'block';
                     loadingDiv.textContent = "正在连接数据库...";
-                    statisticsTable.innerHTML = '';
+                    loadingDiv.className = "loading";
                     
-                    // 测试连接
-                    console.log("测试Supabase连接...");
-                    try {
-                        const { data: testData, error: testError } = await supabaseClient
-                            .from('products')
-                            .select('count', { count: 'exact', head: true });
-                            
-                        if (testError) {
-                            throw testError;
-                        }
-                        console.log("连接成功，数据库可访问");
-                        loadingDiv.textContent = "数据库连接成功，正在获取数据...";
-                    } catch (connError) {
-                        console.error("数据库连接测试失败:", connError);
-                        loadingDiv.textContent = `数据库连接失败: ${connError.message}`;
-                        loadingDiv.className = "loading error";
-                        if (connError.message.includes("cors") || connError.message.includes("CORS")) {
-                            loadingDiv.textContent += "\n可能是跨域问题，请使用本地服务器运行此页面";
-                        }
-                        return;
+                    // 获取所有需要的数据（只请求一次）
+                    const { modelSeries, seriesProcesses, products } = 
+                        await fetchSupabaseData(['modelSeries', 'seriesProcesses', 'products'], forceRefresh);
+                    
+                    if (!modelSeries || modelSeries.length === 0) {
+                        throw new Error("没有获取到有效的model_series数据");
                     }
                     
-                    // 1. 获取model_series数据（产品型号与工艺分类的对应关系）
-                    console.log("获取model_series数据...");
-                    loadingDiv.textContent = "正在获取工艺分类数据...";
-                    const { data: modelSeries, error: modelSeriesError } = await supabaseClient
-                        .from('model_series')
-                        .select('*');
-                        
-                    if (modelSeriesError) {
-                        console.error("获取model_series失败:", modelSeriesError);
-                        throw modelSeriesError;
+                    if (!seriesProcesses || seriesProcesses.length === 0) {
+                        throw new Error("没有获取到有效的series_processes数据");
                     }
-                    console.log(`获取到${modelSeries?.length || 0}条model_series数据`);
                     
-                    // 2. 获取series_processes数据（工艺分类对应的工艺流程）
-                    console.log("获取series_processes数据...");
-                    loadingDiv.textContent = "正在获取工艺流程数据...";
-                    const { data: seriesProcesses, error: seriesProcessesError } = await supabaseClient
-                        .from('series_processes')
-                        .select('*');
-                        
-                    if (seriesProcessesError) {
-                        console.error("获取series_processes失败:", seriesProcessesError);
-                        throw seriesProcessesError;
+                    if (!products || products.length === 0) {
+                        throw new Error("没有获取到有效的products数据");
                     }
-                    console.log(`获取到${seriesProcesses?.length || 0}条series_processes数据`);
-                    
-                    // 3. 获取products数据（产品信息）
-                    console.log("获取products数据...");
-                    loadingDiv.textContent = "正在获取产品数据...";
-                    const { data: products, error: productsError } = await supabaseClient
-                        .from('products')
-                        .select('*');
-                        
-                    if (productsError) {
-                        console.error("获取products失败:", productsError);
-                        throw productsError;
-                    }
-                    console.log(`获取到${products?.length || 0}条products数据`);
                     
                     // 处理数据并展示
                     loadingDiv.textContent = "正在处理数据...";
-                    processAndDisplayData(modelSeries, seriesProcesses, products);
+                    allStatistics = processData(modelSeries, seriesProcesses, products);
+                    
+                    // 更新筛选器选项
+                    updateFilterOptions(allStatistics);
+                    
+                    // 应用初始筛选并显示数据
+                    applyFilters();
                     
                     // 隐藏加载中提示
                     loadingDiv.style.display = 'none';
@@ -207,24 +535,26 @@
                 }
             }
 
-            // 处理数据并显示在表格中
-            function processAndDisplayData(modelSeries, seriesProcesses, products) {
+            // 处理数据
+            function processData(modelSeries, seriesProcesses, products) {
                 // 创建型号到工艺分类的映射
                 const modelToSeries = {};
                 modelSeries.forEach(item => {
-                    modelToSeries[item.model] = item.series;
+                    modelToSeries[item.产品型号] = item.工艺分类;
                 });
                 
                 // 创建工艺分类到工艺流程的映射
                 const seriesToProcesses = {};
                 seriesProcesses.forEach(item => {
-                    if (!seriesToProcesses[item.series]) {
-                        seriesToProcesses[item.series] = [];
+                    const processNames = [];
+                    // 按顺序从process_1到process_8提取工序名称
+                    for (let i = 1; i <= 8; i++) {
+                        const processKey = `process_${i}`;
+                        if (item[processKey] && item[processKey].trim() !== '') {
+                            processNames.push(item[processKey]);
+                        }
                     }
-                    seriesToProcesses[item.series].push({
-                        process: item.process,
-                        step: item.step
-                    });
+                    seriesToProcesses[item.工艺分类] = processNames;
                 });
                 
                 // 分组产品数据，按型号统计
@@ -254,15 +584,14 @@
                             processes: '未定义',
                             completedCount: 0,
                             totalCount: products.length,
-                            completionRate: '0%'
+                            completionRate: '0%',
+                            completionRateValue: 0 // 用于排序
                         });
                         continue;
                     }
                     
                     // 获取工艺流程
                     const processes = seriesToProcesses[series];
-                    // 按工艺流程步骤排序
-                    processes.sort((a, b) => a.step - b.step);
                     
                     // 计算完成最后一步的产品数量
                     let completedCount = 0;
@@ -276,23 +605,209 @@
                     });
                     
                     // 计算完成率
-                    const completionRate = products.length > 0 
-                        ? ((completedCount / products.length) * 100).toFixed(2) + '%' 
-                        : '0%';
+                    const completionRateValue = products.length > 0 
+                        ? (completedCount / products.length) * 100 
+                        : 0;
+                    const completionRate = completionRateValue.toFixed(2) + '%';
                     
                     // 添加到统计结果
                     statistics.push({
                         model,
                         series,
-                        processes: processes.map(p => p.process).join(' -> '),
+                        processes: processes.join(' -> '),
                         completedCount,
                         totalCount: products.length,
-                        completionRate
+                        completionRate,
+                        completionRateValue // 用于排序
                     });
                 }
                 
+                return statistics;
+            }
+            
+            // 更新筛选器选项
+            function updateFilterOptions(statistics) {
+                // 清空现有选项（保留"全部"选项）
+                while (modelFilter.options.length > 1) {
+                    modelFilter.remove(1);
+                }
+                while (seriesFilter.options.length > 1) {
+                    seriesFilter.remove(1);
+                }
+                
+                // 收集唯一的型号和工艺分类
+                const uniqueModels = new Set();
+                const uniqueSeries = new Set();
+                
+                statistics.forEach(stat => {
+                    uniqueModels.add(stat.model);
+                    uniqueSeries.add(stat.series);
+                });
+                
+                // 添加型号选项
+                [...uniqueModels].sort().forEach(model => {
+                    const option = document.createElement('option');
+                    option.value = model;
+                    option.textContent = model;
+                    modelFilter.appendChild(option);
+                });
+                
+                // 添加工艺分类选项
+                [...uniqueSeries].sort().forEach(series => {
+                    const option = document.createElement('option');
+                    option.value = series;
+                    option.textContent = series;
+                    seriesFilter.appendChild(option);
+                });
+            }
+            
+            // 应用筛选
+            function applyFilters() {
+                const selectedModel = modelFilter.value;
+                const selectedSeries = seriesFilter.value;
+                const searchTerm = searchInput.value.toLowerCase().trim();
+                
+                // 应用筛选条件
+                filteredStatistics = allStatistics.filter(stat => {
+                    // 型号筛选
+                    if (selectedModel && stat.model !== selectedModel) {
+                        return false;
+                    }
+                    
+                    // 工艺分类筛选
+                    if (selectedSeries && stat.series !== selectedSeries) {
+                        return false;
+                    }
+                    
+                    // 搜索筛选
+                    if (searchTerm) {
+                        const searchableText = `${stat.model} ${stat.series} ${stat.processes}`.toLowerCase();
+                        if (!searchableText.includes(searchTerm)) {
+                            return false;
+                        }
+                    }
+                    
+                    return true;
+                });
+                
+                // 应用当前排序
+                if (currentSort.column) {
+                    sortTableData(currentSort.column, currentSort.direction);
+                }
+                
+                // 更新表格显示
+                displayStatistics(filteredStatistics);
+            }
+            
+            // 清除筛选
+            function clearFilters() {
+                modelFilter.value = '';
+                seriesFilter.value = '';
+                searchInput.value = '';
+                
+                // 重置到所有数据
+                filteredStatistics = [...allStatistics];
+                
+                // 应用当前排序
+                if (currentSort.column) {
+                    sortTableData(currentSort.column, currentSort.direction);
+                }
+                
+                // 更新表格显示
+                displayStatistics(filteredStatistics);
+            }
+            
+            // 排序表格
+            function sortTable(column) {
+                // 更新排序方向
+                if (currentSort.column === column) {
+                    currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+                } else {
+                    currentSort.column = column;
+                    currentSort.direction = 'asc';
+                }
+                
+                // 应用排序
+                sortTableData(column, currentSort.direction);
+                
+                // 更新表格显示
+                displayStatistics(filteredStatistics);
+                
+                // 更新表头排序指示器
+                updateSortIndicators(column, currentSort.direction);
+            }
+            
+            // 排序数据
+            function sortTableData(column, direction) {
+                filteredStatistics.sort((a, b) => {
+                    let valueA, valueB;
+                    
+                    // 根据列选择排序值
+                    switch (column) {
+                        case 'model':
+                            valueA = a.model;
+                            valueB = b.model;
+                            break;
+                        case 'series':
+                            valueA = a.series;
+                            valueB = b.series;
+                            break;
+                        case 'processes':
+                            valueA = a.processes;
+                            valueB = b.processes;
+                            break;
+                        case 'completedCount':
+                            valueA = a.completedCount / a.totalCount; // 按比例排序更有意义
+                            valueB = b.completedCount / b.totalCount;
+                            break;
+                        case 'completionRate':
+                            valueA = a.completionRateValue;
+                            valueB = b.completionRateValue;
+                            break;
+                        default:
+                            return 0;
+                    }
+                    
+                    // 字符串比较
+                    if (typeof valueA === 'string' && typeof valueB === 'string') {
+                        return direction === 'asc' 
+                            ? valueA.localeCompare(valueB) 
+                            : valueB.localeCompare(valueA);
+                    }
+                    
+                    // 数值比较
+                    return direction === 'asc' 
+                        ? valueA - valueB 
+                        : valueB - valueA;
+                });
+            }
+            
+            // 更新排序指示器
+            function updateSortIndicators(column, direction) {
+                // 清除所有表头的排序标志
+                tableHeader.querySelectorAll('th').forEach(th => {
+                    th.classList.remove('sorted-asc', 'sorted-desc');
+                });
+                
+                // 为当前排序列添加指示器
+                const th = tableHeader.querySelector(`th[data-sort="${column}"]`);
+                if (th) {
+                    th.classList.add(direction === 'asc' ? 'sorted-asc' : 'sorted-desc');
+                }
+            }
+            
+            // 显示统计数据
+            function displayStatistics(statistics) {
                 // 清空现有表格内容
                 statisticsTable.innerHTML = '';
+                
+                // 如果没有数据，显示提示
+                if (statistics.length === 0) {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `<td colspan="4" style="text-align: center;">没有符合条件的数据</td>`;
+                    statisticsTable.appendChild(row);
+                    return;
+                }
                 
                 // 生成表格行
                 statistics.forEach(stat => {
@@ -301,7 +816,6 @@
                     row.innerHTML = `
                         <td>${stat.model}</td>
                         <td>${stat.series}</td>
-                        <td>${stat.processes}</td>
                         <td>${stat.completedCount}/${stat.totalCount}</td>
                         <td>${stat.completionRate}</td>
                     `;
@@ -309,16 +823,341 @@
                     statisticsTable.appendChild(row);
                 });
                 
-                console.log(`已生成 ${statistics.length} 条统计数据`);
+                console.log(`显示 ${statistics.length} 条统计数据`);
             }
-
-            // 设置每分钟轮询
-            const POLL_INTERVAL = 60 * 1000; // 60秒
-            setInterval(fetchProductionData, POLL_INTERVAL);
 
             // 页面加载完成后立即获取数据
             fetchProductionData();
+        };
+
+        // 加载并初始化应用
+        document.addEventListener('DOMContentLoaded', function() {
+            window.initializeApp();
+            
+            // 标签页切换
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.addEventListener('click', function() {
+                    // 移除所有标签页的active类
+                    document.querySelectorAll('.tab-button').forEach(btn => {
+                        btn.classList.remove('active');
+                    });
+                    document.querySelectorAll('.tab-pane').forEach(pane => {
+                        pane.classList.remove('active');
+                    });
+                    
+                    // 添加当前标签页的active类
+                    this.classList.add('active');
+                    const tabId = this.getAttribute('data-tab') + '-tab';
+                    document.getElementById(tabId).classList.add('active');
+                    
+                    // 如果切换到员工视图，加载员工数据
+                    if (this.getAttribute('data-tab') === 'employees') {
+                        fetchEmployeeData();
+                    }
+                });
+            });
         });
+
+        // 获取员工数据
+        async function fetchEmployeeData() {
+            try {
+                // 显示加载中
+                document.getElementById('loading').style.display = 'block';
+                document.getElementById('loading').textContent = "正在获取员工数据...";
+                
+                // 确保产品数据已加载
+                if (!dataCache.products) {
+                    await fetchSupabaseData(['products']);
+                }
+                
+                // 访问全局缓存中的产品数据
+                const products = dataCache.products;
+                
+                if (!products || products.length === 0) {
+                    throw new Error("没有可用的产品数据");
+                }
+                
+                // 处理员工数据并显示
+                document.getElementById('loading').textContent = "正在处理员工数据...";
+                
+                // 创建工序与员工字段的映射
+                const processToEmployeeField = {
+                    '绕线': {field: '绕线员工', timeField: '绕线时间'},
+                    '嵌线': {field: '嵌线员工', timeField: '嵌线时间'},
+                    '接线': {field: '接线员工', timeField: '接线时间'},
+                    '压装': {field: '压装员工', timeField: '压装时间'},
+                    '车止口': {field: '车止口员工', timeField: '车止口时间'},
+                };
+                
+                // 创建员工统计数据
+                const employeeStats = {};
+                
+                // 遍历所有产品记录
+                products.forEach(product => {
+                    // 遍历所有工序
+                    for (const [process, fields] of Object.entries(processToEmployeeField)) {
+                        const employeeField = fields.field;
+                        const timeField = fields.timeField;
+                        const employee = product[employeeField];
+                        const timestamp = product[timeField];
+                        
+                        // 如果有员工和时间戳，说明该员工完成了这道工序
+                        if (employee && timestamp) {
+                            // 初始化该员工的统计记录
+                            if (!employeeStats[employee]) {
+                                employeeStats[employee] = {
+                                    name: employee,
+                                    processes: {},
+                                    models: {},  // 按产品型号统计
+                                    timestamps: [],  // 存储所有时间戳，用于计算活动情况
+                                    totalCompleted: 0
+                                };
+                            }
+                            
+                            // 初始化该工序的计数
+                            if (!employeeStats[employee].processes[process]) {
+                                employeeStats[employee].processes[process] = 0;
+                            }
+                            
+                            // 增加完成计数
+                            employeeStats[employee].processes[process]++;
+                            employeeStats[employee].totalCompleted++;
+                            
+                            // 记录产品型号
+                            const model = product.产品型号 || '未知型号';
+                            if (!employeeStats[employee].models[model]) {
+                                employeeStats[employee].models[model] = 0;
+                            }
+                            employeeStats[employee].models[model]++;
+                            
+                            // 记录时间戳
+                            if (timestamp) {
+                                employeeStats[employee].timestamps.push({
+                                    time: timestamp,
+                                    process: process,
+                                    productCode: product.产品编码
+                                });
+                            }
+                        }
+                    }
+                });
+                
+                // 转换为数组形式便于展示
+                const employeeData = Object.values(employeeStats).map(stat => {
+                    // 找出员工完成数量最多的工序
+                    let mainProcess = '';
+                    let maxCount = 0;
+                    
+                    for (const [process, count] of Object.entries(stat.processes)) {
+                        if (count > maxCount) {
+                            maxCount = count;
+                            mainProcess = process;
+                        }
+                    }
+                    
+                    // 创建工序详情
+                    const processDetail = Object.entries(stat.processes)
+                        .map(([process, count]) => `${process}: ${count}`)
+                        .join(', ');
+                    
+                    // 计算每天平均完成产品数（效率指数）
+                    const efficiency = calculateEfficiency(stat);
+                    
+                    // 获取最近活动
+                    let lastActive = '无记录';
+                    if (stat.timestamps.length > 0) {
+                        // 按时间降序排序
+                        stat.timestamps.sort((a, b) => {
+                            return new Date(b.time) - new Date(a.time);
+                        });
+                        
+                        // 获取最近的活动
+                        const recentActivity = stat.timestamps[0];
+                        const activityDate = new Date(recentActivity.time);
+                        lastActive = `${activityDate.toLocaleDateString()} (${recentActivity.process})`;
+                    }
+                    
+                    return {
+                        employee: stat.name,
+                        processType: mainProcess,
+                        processDetail: processDetail,
+                        completedCount: stat.totalCompleted,
+                        efficiency: `${efficiency.toFixed(2)} 件/天`,
+                        lastActive: lastActive,
+                        // 存储原始数据，用于展示详情
+                        rawData: stat
+                    };
+                });
+                
+                // 按总完成数排序
+                employeeData.sort((a, b) => b.completedCount - a.completedCount);
+                
+                // 显示员工数据
+                displayEmployeeStatistics(employeeData);
+                
+                // 隐藏加载中
+                document.getElementById('loading').style.display = 'none';
+            } catch (error) {
+                console.error('获取员工数据失败:', error);
+                document.getElementById('loading').textContent = `加载员工数据失败: ${error.message}`;
+                document.getElementById('loading').className = "loading error";
+            }
+        }
+
+        // 根据工序获取部门名称
+        function getEmployeeDepartment(process) {
+            // 简单映射工序到部门
+            const processToDepartment = {
+                '绕线': '绕线部',
+                '嵌线': '嵌线部',
+                '接线': '接线部',
+                '压装': '压装部',
+                '车止口': '车止口部'
+            };
+            
+            return processToDepartment[process] || '生产部';
+        }
+
+        // 计算员工效率（每天平均完成数量）
+        function calculateEfficiency(employeeData) {
+            // 获取最早和最晚的时间戳，计算工作天数
+            let earliestDate = null;
+            let latestDate = null;
+            
+            // 假设我们已经有了时间戳数据（实际应该从产品记录中提取）
+            // 这里简化处理，使用员工总完成数除以固定天数
+            const assumedWorkDays = 30; // 假设是一个月的工作日
+            
+            return employeeData.totalCompleted / assumedWorkDays;
+        }
+
+        // 显示员工统计数据
+        function displayEmployeeStatistics(employeeData) {
+            const tableBody = document.getElementById('employee-statistics').querySelector('tbody');
+            tableBody.innerHTML = '';
+            
+            // 如果没有数据，显示提示
+            if (employeeData.length === 0) {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td colspan="6" style="text-align: center;">没有员工数据</td>`;
+                tableBody.appendChild(row);
+                return;
+            }
+            
+            // 生成表格行
+            employeeData.forEach(stat => {
+                const row = document.createElement('tr');
+                
+                // 添加点击事件展示更多详情
+                row.style.cursor = 'pointer';
+                row.addEventListener('click', () => showEmployeeDetails(stat.rawData));
+                
+                row.innerHTML = `
+                    <td>${stat.employee}</td>
+                    <td>${stat.processType}</td>
+                    <td>${stat.processDetail}</td>
+                    <td>${stat.completedCount}</td>
+                    <td>${stat.efficiency}</td>
+                    <td>${stat.lastActive}</td>
+                `;
+                
+                tableBody.appendChild(row);
+            });
+        }
+
+        // 添加员工详情显示函数
+        function showEmployeeDetails(employeeData) {
+            // 创建模态框显示员工详细信息
+            const modalContainer = document.createElement('div');
+            modalContainer.style.position = 'fixed';
+            modalContainer.style.top = '0';
+            modalContainer.style.left = '0';
+            modalContainer.style.width = '100%';
+            modalContainer.style.height = '100%';
+            modalContainer.style.backgroundColor = 'rgba(0,0,0,0.7)';
+            modalContainer.style.display = 'flex';
+            modalContainer.style.justifyContent = 'center';
+            modalContainer.style.alignItems = 'center';
+            modalContainer.style.zIndex = '1000';
+            
+            const modalContent = document.createElement('div');
+            modalContent.style.backgroundColor = 'white';
+            modalContent.style.padding = '20px';
+            modalContent.style.borderRadius = '5px';
+            modalContent.style.width = '80%';
+            modalContent.style.maxWidth = '800px';
+            modalContent.style.maxHeight = '80%';
+            modalContent.style.overflow = 'auto';
+            
+            // 添加关闭按钮
+            const closeButton = document.createElement('button');
+            closeButton.textContent = '关闭';
+            closeButton.style.float = 'right';
+            closeButton.style.padding = '5px 10px';
+            closeButton.style.backgroundColor = '#f44336';
+            closeButton.style.color = 'white';
+            closeButton.style.border = 'none';
+            closeButton.style.borderRadius = '3px';
+            closeButton.style.cursor = 'pointer';
+            closeButton.addEventListener('click', () => {
+                document.body.removeChild(modalContainer);
+            });
+            
+            // 构建详情内容
+            const title = document.createElement('h2');
+            title.textContent = `员工详情: ${employeeData.name}`;
+            
+            const processesSection = document.createElement('div');
+            processesSection.innerHTML = `<h3>工序完成情况</h3>`;
+            
+            // 工序完成饼图占位符
+            const processChartContainer = document.createElement('div');
+            processChartContainer.style.width = '100%';
+            processChartContainer.style.height = '300px';
+            processChartContainer.style.marginBottom = '20px';
+            
+            // 产品型号完成情况
+            const modelsSection = document.createElement('div');
+            modelsSection.innerHTML = `<h3>产品型号完成情况</h3>`;
+            
+            const modelsList = document.createElement('ul');
+            Object.entries(employeeData.models)
+                .sort((a, b) => b[1] - a[1]) // 按数量降序排序
+                .forEach(([model, count]) => {
+                    const li = document.createElement('li');
+                    li.textContent = `${model}: ${count}件`;
+                    modelsList.appendChild(li);
+                });
+            
+            // 最近活动记录
+            const recentActivitiesSection = document.createElement('div');
+            recentActivitiesSection.innerHTML = `<h3>最近活动记录</h3>`;
+            
+            const activitiesList = document.createElement('ul');
+            // 只显示最近10条记录
+            employeeData.timestamps
+                .sort((a, b) => new Date(b.time) - new Date(a.time))
+                .slice(0, 10)
+                .forEach(activity => {
+                    const li = document.createElement('li');
+                    const activityDate = new Date(activity.time);
+                    li.textContent = `${activityDate.toLocaleString()} - ${activity.process} - 产品编码: ${activity.productCode}`;
+                    activitiesList.appendChild(li);
+                });
+            
+            // 组装内容
+            modalContent.appendChild(closeButton);
+            modalContent.appendChild(title);
+            modalContent.appendChild(processesSection);
+            modalContent.appendChild(processChartContainer);
+            modalContent.appendChild(modelsSection);
+            modalContent.appendChild(modelsList);
+            modalContent.appendChild(recentActivitiesSection);
+            modalContent.appendChild(activitiesList);
+            
+            modalContainer.appendChild(modalContent);
+            document.body.appendChild(modalContainer);
+        }
     </script>
 </body>
 </html>
