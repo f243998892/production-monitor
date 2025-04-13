@@ -345,7 +345,86 @@
         .detail-btn:hover {
             background-color: #0b7dda;
         }
+        
+        /* 分析页面样式 */
+        .analysis-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #f8f8f8;
+            border-radius: 4px;
+        }
+        
+        .analysis-btn {
+            padding: 8px 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .analysis-btn:hover {
+            background-color: #45a049;
+        }
+        
+        .stats-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .stat-card {
+            flex: 1;
+            min-width: 150px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .stat-card h3 {
+            margin: 0 0 10px 0;
+            font-size: 1rem;
+            color: #555;
+        }
+        
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .difficulty-high {
+            color: #F44336;
+        }
+        
+        .difficulty-medium {
+            color: #FFC107;
+        }
+        
+        .difficulty-low {
+            color: #4CAF50;
+        }
+        
+        .tooltip {
+            position: absolute;
+            background-color: rgba(0,0,0,0.8);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            pointer-events: none;
+            z-index: 1000;
+            display: none;
+        }
     </style>
+    <!-- 引入Chart.js图表库 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- 引入Excel导出库 -->
     <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
 </head>
@@ -432,6 +511,8 @@
                 <button class="tab-button active" data-tab="products">产品型号视图</button>
                 <button class="tab-button" data-tab="employees">员工视图</button>
                 <button class="tab-button" data-tab="wip">在制品视图</button>
+                <button class="tab-button" data-tab="difficulty">难度分析</button>
+                <button class="tab-button" data-tab="timing">工序时间分析</button>
             </div>
             
             <!-- 标签页内容 -->
@@ -526,6 +607,123 @@
                             <!-- 动态填充 -->
                         </tbody>
                     </table>
+                </div>
+                
+                <!-- 产品型号难度分析视图 -->
+                <div id="difficulty-tab" class="tab-pane">
+                    <div class="analysis-controls">
+                        <button id="calculate-difficulty" class="analysis-btn">计算难度系数</button>
+                        <div class="filter-group">
+                            <label for="diff-metric">难度评估指标</label>
+                            <select id="diff-metric">
+                                <option value="totalTime">总生产时间</option>
+                                <option value="processTime">工序平均时间</option>
+                                <option value="cycleTime">生产周期</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="analysis-result">
+                        <div id="difficulty-chart-container" style="height: 400px; margin-top: 20px;">
+                            <canvas id="difficulty-chart"></canvas>
+                        </div>
+                        
+                        <table id="difficulty-table">
+                            <thead>
+                                <tr>
+                                    <th data-sort="model">产品型号</th>
+                                    <th data-sort="series">工艺分类</th>
+                                    <th data-sort="avgTime">平均生产时间</th>
+                                    <th data-sort="difficultyIndex">难度系数</th>
+                                    <th data-sort="sampleCount">样本数量</th>
+                                    <th data-sort="processes">工序数量</th>
+                                    <th>详情</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- 动态填充 -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- 工序时间分析视图 -->
+                <div id="timing-tab" class="tab-pane">
+                    <div class="analysis-controls">
+                        <div class="filter-group">
+                            <label for="timing-employee">选择员工</label>
+                            <select id="timing-employee">
+                                <option value="">全部员工</option>
+                                <!-- 动态填充 -->
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="timing-process">选择工序</label>
+                            <select id="timing-process">
+                                <option value="">全部工序</option>
+                                <option value="绕线">绕线</option>
+                                <option value="嵌线">嵌线</option>
+                                <option value="接线">接线</option>
+                                <option value="压装">压装</option>
+                                <option value="车止口">车止口</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="timing-model">产品型号</label>
+                            <select id="timing-model">
+                                <option value="">全部型号</option>
+                                <!-- 动态填充 -->
+                            </select>
+                        </div>
+                        <button id="calculate-timing" class="analysis-btn">计算工序时间</button>
+                    </div>
+                    
+                    <div class="analysis-result">
+                        <div id="timing-chart-container" style="height: 300px; margin-top: 20px;">
+                            <canvas id="timing-chart"></canvas>
+                        </div>
+                        
+                        <div id="timing-stats" class="stats-container">
+                            <div class="stat-card">
+                                <h3>平均工序时间</h3>
+                                <div id="avg-time" class="stat-value">-</div>
+                            </div>
+                            <div class="stat-card">
+                                <h3>最短时间</h3>
+                                <div id="min-time" class="stat-value">-</div>
+                            </div>
+                            <div class="stat-card">
+                                <h3>最长时间</h3>
+                                <div id="max-time" class="stat-value">-</div>
+                            </div>
+                            <div class="stat-card">
+                                <h3>样本数量</h3>
+                                <div id="sample-count" class="stat-value">-</div>
+                            </div>
+                            <div class="stat-card">
+                                <h3>异常值数量</h3>
+                                <div id="outlier-count" class="stat-value">-</div>
+                            </div>
+                        </div>
+                        
+                        <table id="timing-table">
+                            <thead>
+                                <tr>
+                                    <th data-sort="employee">员工</th>
+                                    <th data-sort="process">工序</th>
+                                    <th data-sort="model">产品型号</th>
+                                    <th data-sort="avgTime">平均时间(秒)</th>
+                                    <th data-sort="medianTime">中位数时间</th>
+                                    <th data-sort="validCount">有效样本</th>
+                                    <th data-sort="crossDayCount">跨天样本</th>
+                                    <th data-sort="outOfRangeCount">超范围样本</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- 动态填充 -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1416,6 +1614,16 @@
                     // 如果切换到员工视图，加载员工数据
                     if (this.getAttribute('data-tab') === 'employees') {
                         fetchEmployeeData();
+                    }
+                    
+                    // 如果切换到难度分析视图，初始化难度分析
+                    if (this.getAttribute('data-tab') === 'difficulty') {
+                        initDifficultyAnalysis();
+                    }
+                    
+                    // 如果切换到工序时间分析视图，初始化时间分析
+                    if (this.getAttribute('data-tab') === 'timing') {
+                        initTimingAnalysis();
                     }
                 });
             });
@@ -2435,6 +2643,1110 @@
                 
                 tableBody.appendChild(row);
             });
+        }
+
+        // 功能10：产品型号难度系数分析
+        let difficultyChart = null;
+        function initDifficultyAnalysis() {
+            // 确保数据已加载
+            if (!dataCache.products || !dataCache.modelSeries || !dataCache.seriesProcesses) {
+                document.getElementById('loading').style.display = 'block';
+                document.getElementById('loading').textContent = "正在加载数据，请稍候...";
+                fetchSupabaseData(['products', 'modelSeries', 'seriesProcesses']).then(() => {
+                    document.getElementById('loading').style.display = 'none';
+                    calculateDifficultyIndex();
+                });
+                return;
+            }
+            
+            // 绑定计算按钮事件
+            document.getElementById('calculate-difficulty').addEventListener('click', calculateDifficultyIndex);
+            
+            // 绑定指标切换事件
+            document.getElementById('diff-metric').addEventListener('change', calculateDifficultyIndex);
+        }
+        
+        // 计算难度系数
+        function calculateDifficultyIndex() {
+            const products = dataCache.products;
+            const modelSeries = dataCache.modelSeries;
+            const seriesProcesses = dataCache.seriesProcesses;
+            
+            if (!products || products.length === 0) {
+                alert('没有可用的产品数据');
+                return;
+            }
+            
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('loading').textContent = "正在计算难度系数...";
+            
+            // 获取选定的难度评估指标
+            const diffMetric = document.getElementById('diff-metric').value;
+            
+            // 创建产品型号到工艺分类的映射
+            const modelToSeries = {};
+            modelSeries.forEach(item => {
+                modelToSeries[item.产品型号] = item.工艺分类;
+            });
+            
+            // 创建工艺分类到工序的映射
+            const seriesToProcesses = {};
+            seriesProcesses.forEach(item => {
+                const processes = [];
+                for (let i = 1; i <= 8; i++) {
+                    if (item[`process_${i}`]) {
+                        processes.push(item[`process_${i}`]);
+                    }
+                }
+                seriesToProcesses[item.工艺分类] = processes;
+            });
+            
+            // 所有可能的工序及其对应的时间字段
+            const processTimeFields = {
+                '绕线': '绕线时间',
+                '嵌线': '嵌线时间',
+                '接线': '接线时间',
+                '压装': '压装时间',
+                '半成品检验': '半成品检验时间',
+                '浸漆': '浸漆时间',
+                '车止口': '车止口时间',
+                '成品检验': '成品检验时间'
+            };
+            
+            // 按产品型号分组
+            const productsByModel = {};
+            products.forEach(product => {
+                if (!product.产品型号) return;
+                
+                if (!productsByModel[product.产品型号]) {
+                    productsByModel[product.产品型号] = [];
+                }
+                productsByModel[product.产品型号].push(product);
+            });
+            
+            // 计算每个型号的平均生产时间
+            const modelDifficulty = [];
+            
+            Object.entries(productsByModel).forEach(([model, modelProducts]) => {
+                const series = modelToSeries[model] || '未知';
+                const processes = seriesToProcesses[series] || [];
+                
+                // 跳过没有定义工序的型号
+                if (processes.length === 0) return;
+                
+                // 完成所有工序的产品
+                const completedProducts = modelProducts.filter(product => {
+                    if (!processes.length) return false;
+                    const lastProcess = processes[processes.length - 1];
+                    const lastTimeField = processTimeFields[lastProcess];
+                    return lastTimeField && product[lastTimeField];
+                });
+                
+                // 如果没有完成的产品，跳过
+                if (completedProducts.length === 0) return;
+                
+                // 计算每个完成的产品的生产时间
+                const productionTimes = [];
+                const processTimes = {}; // 每个工序的时间
+                
+                completedProducts.forEach(product => {
+                    let firstTime = null;
+                    let lastTime = null;
+                    
+                    // 初始化工序时间
+                    processes.forEach(process => {
+                        if (!processTimes[process]) {
+                            processTimes[process] = [];
+                        }
+                    });
+                    
+                    // 计算相邻工序之间的时间差
+                    for (let i = 0; i < processes.length; i++) {
+                        const currentProcess = processes[i];
+                        const currentTimeField = processTimeFields[currentProcess];
+                        
+                        if (!currentTimeField || !product[currentTimeField]) continue;
+                        
+                        const currentTime = new Date(product[currentTimeField]);
+                        
+                        // 记录第一个工序时间
+                        if (firstTime === null) {
+                            firstTime = currentTime;
+                        }
+                        
+                        // 上一个工序时间
+                        const prevProcess = i > 0 ? processes[i-1] : null;
+                        const prevTimeField = prevProcess ? processTimeFields[prevProcess] : null;
+                        
+                        if (prevProcess && prevTimeField && product[prevTimeField]) {
+                            const prevTime = new Date(product[prevTimeField]);
+                            // 计算工序间的时间差（小时）
+                            const processTime = (currentTime - prevTime) / (1000 * 60 * 60);
+                            
+                            // 排除异常大的间隔（如隔天）
+                            if (processTime > 0 && processTime < 24) {
+                                processTimes[currentProcess].push(processTime);
+                            }
+                        }
+                        
+                        // 更新最后一个工序时间
+                        lastTime = currentTime;
+                    }
+                    
+                    // 计算总生产时间（小时）
+                    if (firstTime && lastTime) {
+                        const totalTime = (lastTime - firstTime) / (1000 * 60 * 60);
+                        // 排除异常大的总时间（如跨越多天）
+                        if (totalTime > 0 && totalTime < 80) { // 允许最多80小时（约3天多）
+                            productionTimes.push(totalTime);
+                        }
+                    }
+                });
+                
+                // 计算平均生产时间
+                let avgProductionTime = 0;
+                let difficultyValue = 0;
+                
+                if (diffMetric === 'totalTime') {
+                    // 使用总生产时间作为难度指标
+                    avgProductionTime = productionTimes.reduce((sum, time) => sum + time, 0) / productionTimes.length;
+                    difficultyValue = avgProductionTime;
+                } 
+                else if (diffMetric === 'processTime') {
+                    // 使用平均工序时间作为难度指标
+                    let totalProcessTime = 0;
+                    let processCount = 0;
+                    
+                    Object.values(processTimes).forEach(times => {
+                        if (times.length > 0) {
+                            totalProcessTime += times.reduce((sum, time) => sum + time, 0);
+                            processCount += times.length;
+                        }
+                    });
+                    
+                    avgProductionTime = totalProcessTime / processCount || 0;
+                    difficultyValue = avgProductionTime;
+                }
+                else if (diffMetric === 'cycleTime') {
+                    // 使用生产周期（从第一道工序到最后一道的时间）作为难度指标
+                    avgProductionTime = productionTimes.reduce((sum, time) => sum + time, 0) / productionTimes.length;
+                    difficultyValue = avgProductionTime / processes.length; // 平均每道工序的时间
+                }
+                
+                // 添加到难度列表
+                modelDifficulty.push({
+                    model,
+                    series,
+                    avgProductionTime: avgProductionTime.toFixed(2),
+                    difficultyValue,
+                    sampleCount: completedProducts.length,
+                    processCount: processes.length,
+                    processes: processes.join(' -> ')
+                });
+            });
+            
+            // 按难度值排序
+            modelDifficulty.sort((a, b) => b.difficultyValue - a.difficultyValue);
+            
+            // 计算难度系数（相对值）
+            if (modelDifficulty.length > 0) {
+                const maxDifficulty = modelDifficulty[0].difficultyValue;
+                modelDifficulty.forEach(item => {
+                    item.difficultyIndex = ((item.difficultyValue / maxDifficulty) * 100).toFixed(0);
+                });
+            }
+            
+            // 显示难度表格
+            displayDifficultyTable(modelDifficulty);
+            
+            // 显示难度图表
+            displayDifficultyChart(modelDifficulty);
+            
+            document.getElementById('loading').style.display = 'none';
+        }
+        
+        // 显示难度表格
+        function displayDifficultyTable(modelDifficulty) {
+            const tableBody = document.getElementById('difficulty-table').querySelector('tbody');
+            tableBody.innerHTML = '';
+            
+            if (modelDifficulty.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center;">没有足够的数据计算难度系数</td></tr>';
+                return;
+            }
+            
+            modelDifficulty.forEach(item => {
+                const row = document.createElement('tr');
+                
+                // 根据难度系数添加颜色
+                let difficultyClass = '';
+                const diffIndex = parseInt(item.difficultyIndex);
+                if (diffIndex >= 80) {
+                    difficultyClass = 'difficulty-high';
+                } else if (diffIndex >= 40) {
+                    difficultyClass = 'difficulty-medium';
+                } else {
+                    difficultyClass = 'difficulty-low';
+                }
+                
+                row.innerHTML = `
+                    <td>${item.model}</td>
+                    <td>${item.series}</td>
+                    <td>${item.avgProductionTime} 小时</td>
+                    <td class="${difficultyClass}">${item.difficultyIndex}</td>
+                    <td>${item.sampleCount}</td>
+                    <td>${item.processCount}</td>
+                    <td><button class="detail-btn" data-model="${item.model}">详情</button></td>
+                `;
+                
+                tableBody.appendChild(row);
+            });
+            
+            // 添加详情按钮事件
+            document.querySelectorAll('#difficulty-table .detail-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const model = this.getAttribute('data-model');
+                    // TODO: 显示详细难度分析
+                    alert(`${model} 的详细难度分析功能待实现`);
+                });
+            });
+        }
+        
+        // 显示难度图表
+        function displayDifficultyChart(modelDifficulty) {
+            const ctx = document.getElementById('difficulty-chart').getContext('2d');
+            
+            // 只显示前10个最难的型号
+            const topModels = modelDifficulty.slice(0, 10);
+            
+            // 准备图表数据
+            const labels = topModels.map(item => item.model);
+            const difficulties = topModels.map(item => parseFloat(item.difficultyIndex));
+            const times = topModels.map(item => parseFloat(item.avgProductionTime));
+            
+            // 如果已存在图表，销毁它
+            if (difficultyChart) {
+                difficultyChart.destroy();
+            }
+            
+            // 创建新图表
+            difficultyChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '难度系数',
+                        data: difficulties,
+                        backgroundColor: difficulties.map(d => {
+                            if (d >= 80) return 'rgba(255, 99, 132, 0.7)';
+                            if (d >= 40) return 'rgba(255, 205, 86, 0.7)';
+                            return 'rgba(75, 192, 192, 0.7)';
+                        }),
+                        borderColor: difficulties.map(d => {
+                            if (d >= 80) return 'rgb(255, 99, 132)';
+                            if (d >= 40) return 'rgb(255, 205, 86)';
+                            return 'rgb(75, 192, 192)';
+                        }),
+                        borderWidth: 1
+                    }, {
+                        label: '平均生产时间 (小时)',
+                        data: times,
+                        type: 'line',
+                        fill: false,
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        tension: 0.1,
+                        yAxisID: 'y1'
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: '难度系数'
+                            }
+                        },
+                        y1: {
+                            position: 'right',
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: '时间 (小时)'
+                            },
+                            grid: {
+                                drawOnChartArea: false
+                            }
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '产品型号难度系数分析'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                afterLabel: function(context) {
+                                    const index = context.dataIndex;
+                                    return `样本数量: ${topModels[index].sampleCount}`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 新增功能：工序平均时间分析
+        let timingChart = null;
+        function initTimingAnalysis() {
+            // 确保数据已加载
+            if (!dataCache.products) {
+                document.getElementById('loading').style.display = 'block';
+                document.getElementById('loading').textContent = "正在加载数据，请稍候...";
+                fetchSupabaseData(['products']).then(() => {
+                    document.getElementById('loading').style.display = 'none';
+                    prepareTimingAnalysis();
+                });
+                return;
+            }
+            
+            prepareTimingAnalysis();
+            
+            // 绑定计算按钮事件
+            document.getElementById('calculate-timing').addEventListener('click', calculateProcessTiming);
+        }
+        
+        // 准备工序时间分析的初始化数据
+        function prepareTimingAnalysis() {
+            const products = dataCache.products;
+            
+            if (!products || products.length === 0) {
+                alert('没有可用的产品数据');
+                return;
+            }
+            
+            // 收集所有员工
+            const employees = new Set();
+            
+            // 收集所有产品型号
+            const models = new Set();
+            
+            // 工序到员工字段的映射
+            const processToEmployeeField = {
+                '绕线': '绕线员工',
+                '嵌线': '嵌线员工',
+                '接线': '接线员工',
+                '压装': '压装员工',
+                '车止口': '车止口员工'
+            };
+            
+            // 遍历产品，收集员工和型号
+            products.forEach(product => {
+                // 添加产品型号
+                if (product.产品型号) {
+                    models.add(product.产品型号);
+                }
+                
+                // 添加各工序员工
+                Object.values(processToEmployeeField).forEach(field => {
+                    if (product[field]) {
+                        employees.add(product[field]);
+                    }
+                });
+            });
+            
+            // 更新员工选择下拉框
+            const employeeSelect = document.getElementById('timing-employee');
+            // 清空现有选项（保留"全部"选项）
+            while (employeeSelect.options.length > 1) {
+                employeeSelect.remove(1);
+            }
+            
+            // 添加员工选项
+            [...employees].sort().forEach(employee => {
+                const option = document.createElement('option');
+                option.value = employee;
+                option.textContent = employee;
+                employeeSelect.appendChild(option);
+            });
+            
+            // 更新产品型号选择下拉框
+            const modelSelect = document.getElementById('timing-model');
+            // 清空现有选项（保留"全部"选项）
+            while (modelSelect.options.length > 1) {
+                modelSelect.remove(1);
+            }
+            
+            // 添加产品型号选项
+            [...models].sort().forEach(model => {
+                const option = document.createElement('option');
+                option.value = model;
+                option.textContent = model;
+                modelSelect.appendChild(option);
+            });
+        }
+        
+        // 计算工序平均时间
+        function calculateProcessTiming() {
+            const products = dataCache.products;
+            
+            if (!products || products.length === 0) {
+                alert('没有可用的产品数据');
+                return;
+            }
+            
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('loading').textContent = "正在计算工序时间...";
+            
+            // 获取选定的筛选条件
+            const selectedEmployee = document.getElementById('timing-employee').value;
+            const selectedProcess = document.getElementById('timing-process').value;
+            const selectedModel = document.getElementById('timing-model').value;
+            
+            // 如果没有选择工序，提示用户
+            if (!selectedProcess) {
+                alert('请选择要分析的工序');
+                document.getElementById('loading').style.display = 'none';
+                return;
+            }
+            
+            // 工序到员工字段和时间字段的映射
+            const processFields = {
+                '绕线': {employeeField: '绕线员工', timeField: '绕线时间'},
+                '嵌线': {employeeField: '嵌线员工', timeField: '嵌线时间'},
+                '接线': {employeeField: '接线员工', timeField: '接线时间'},
+                '压装': {employeeField: '压装员工', timeField: '压装时间'},
+                '车止口': {employeeField: '车止口员工', timeField: '车止口时间'}
+            };
+            
+            // 获取选定工序的字段
+            const processInfo = processFields[selectedProcess];
+            if (!processInfo) {
+                alert('未找到该工序的字段定义');
+                document.getElementById('loading').style.display = 'none';
+                return;
+            }
+            
+            // 首先按员工分组，获取每个员工按时间排序的工序记录
+            const productsByEmployee = {};
+            
+            products.forEach(product => {
+                // 检查是否有员工和时间记录
+                const employee = product[processInfo.employeeField];
+                const timestamp = product[processInfo.timeField];
+                
+                if (!employee || !timestamp) return;
+                
+                // 应用员工筛选
+                if (selectedEmployee && employee !== selectedEmployee) {
+                    return;
+                }
+                
+                // 应用产品型号筛选 - 不过滤掉其他型号，而是在统计阶段处理
+                // 因为需要连续的产品记录计算时间差
+                
+                if (!productsByEmployee[employee]) {
+                    productsByEmployee[employee] = [];
+                }
+                
+                productsByEmployee[employee].push({
+                    productCode: product.产品编码,
+                    model: product.产品型号 || '未知型号',
+                    timestamp: new Date(timestamp),
+                    employee: employee
+                });
+            });
+            
+            // 用于存储每个型号的样本数据
+            const samplesByModel = {};
+            
+            // 处理每个员工的连续产品记录
+            Object.entries(productsByEmployee).forEach(([employee, employeeProducts]) => {
+                // 按时间戳排序
+                employeeProducts.sort((a, b) => a.timestamp - b.timestamp);
+                
+                // 计算连续产品之间的时间差
+                for (let i = 1; i < employeeProducts.length; i++) {
+                    const prevProduct = employeeProducts[i-1];
+                    const currProduct = employeeProducts[i];
+                    
+                    // 计算时间差（秒）
+                    const timeDiff = (currProduct.timestamp - prevProduct.timestamp) / 1000;
+                    
+                    // 检查是否为跨天样本
+                    const prevDate = new Date(prevProduct.timestamp);
+                    const currDate = new Date(currProduct.timestamp);
+                    const isSameDay = 
+                        prevDate.getFullYear() === currDate.getFullYear() &&
+                        prevDate.getMonth() === currDate.getMonth() &&
+                        prevDate.getDate() === currDate.getDate();
+                    
+                    // 创建样本对象 - 重要：样本属于前一个产品的型号
+                    const prevModel = prevProduct.model;
+                    
+                    // 初始化该型号的样本数组
+                    if (!samplesByModel[prevModel]) {
+                        samplesByModel[prevModel] = [];
+                    }
+                    
+                    // 应用产品型号筛选 - 只在这里筛选
+                    if (selectedModel && prevModel !== selectedModel) {
+                        continue;
+                    }
+                    
+                    // 创建样本对象
+                    const sample = {
+                        employee,
+                        model: prevModel,
+                        timeDiff,
+                        prevTimestamp: prevProduct.timestamp,
+                        currTimestamp: currProduct.timestamp,
+                        prevProductCode: prevProduct.productCode,
+                        currProductCode: currProduct.productCode, 
+                        currModel: currProduct.model,
+                        isCrossDay: !isSameDay,
+                        isOutlier: !isSameDay, // 跨天样本直接标记为异常
+                        reason: !isSameDay ? '跨天样本' : ''
+                    };
+                    
+                    // 如果时间差为负或过大，也标记为异常
+                    if (timeDiff <= 0) {
+                        sample.isOutlier = true;
+                        sample.reason = '时间倒流';
+                    } else if (timeDiff > 21600) { // 6小时
+                        sample.isOutlier = true;
+                        sample.reason = '时间过长';
+                    }
+                    
+                    // 添加样本
+                    samplesByModel[prevModel].push(sample);
+                }
+            });
+            
+            // 应用第二阶段筛选：剔除超出均值±60%范围的样本
+            Object.entries(samplesByModel).forEach(([model, samples]) => {
+                // 首先找出非跨天和其他明显异常的样本
+                const validSamplesStep1 = samples.filter(sample => !sample.isOutlier);
+                
+                if (validSamplesStep1.length > 0) {
+                    // 计算初步有效样本的平均值
+                    const totalTimeStep1 = validSamplesStep1.reduce((sum, sample) => sum + sample.timeDiff, 0);
+                    const avgTimeStep1 = totalTimeStep1 / validSamplesStep1.length;
+                    
+                    // 计算允许范围（均值的40%-160%）
+                    const lowerBound = avgTimeStep1 * 0.4;
+                    const upperBound = avgTimeStep1 * 1.6;
+                    
+                    // 标记超出范围的样本
+                    samples.forEach(sample => {
+                        if (!sample.isOutlier && (sample.timeDiff < lowerBound || sample.timeDiff > upperBound)) {
+                            sample.isOutlier = true;
+                            sample.reason = '超出均值±60%范围';
+                        }
+                    });
+                }
+            });
+            
+            // 按员工和型号统计结果
+            const resultsByEmployee = {};
+            const resultsByModel = {};
+            
+            // 处理每个型号的样本
+            Object.entries(samplesByModel).forEach(([model, samples]) => {
+                // 获取有效样本
+                const validSamples = samples.filter(sample => !sample.isOutlier);
+                
+                // 按员工分组
+                const samplesByEmployee = {};
+                samples.forEach(sample => {
+                    if (!samplesByEmployee[sample.employee]) {
+                        samplesByEmployee[sample.employee] = [];
+                    }
+                    samplesByEmployee[sample.employee].push(sample);
+                });
+                
+                // 计算每个员工在该型号上的统计数据
+                Object.entries(samplesByEmployee).forEach(([employee, empSamples]) => {
+                    const validEmpSamples = empSamples.filter(sample => !sample.isOutlier);
+                    if (validEmpSamples.length === 0) return;
+                    
+                    // 计算员工在该型号上的平均时间
+                    const totalTime = validEmpSamples.reduce((sum, sample) => sum + sample.timeDiff, 0);
+                    const avgTime = totalTime / validEmpSamples.length;
+                    
+                    // 计算中位数
+                    const sortedTimes = validEmpSamples.map(sample => sample.timeDiff).sort((a, b) => a - b);
+                    const medianIndex = Math.floor(sortedTimes.length / 2);
+                    const medianTime = sortedTimes.length % 2 === 0 
+                        ? (sortedTimes[medianIndex-1] + sortedTimes[medianIndex]) / 2 
+                        : sortedTimes[medianIndex];
+                    
+                    const empModelResult = {
+                        employee,
+                        model,
+                        process: selectedProcess,
+                        avgTime,
+                        medianTime,
+                        minTime: Math.min(...sortedTimes),
+                        maxTime: Math.max(...sortedTimes),
+                        validCount: validEmpSamples.length,
+                        outlierCount: empSamples.length - validEmpSamples.length,
+                        crossDayCount: empSamples.filter(sample => sample.isCrossDay).length,
+                        outOfRangeCount: empSamples.filter(sample => !sample.isCrossDay && sample.isOutlier).length
+                    };
+                    
+                    // 添加到员工结果
+                    if (!resultsByEmployee[employee]) {
+                        resultsByEmployee[employee] = [];
+                    }
+                    resultsByEmployee[employee].push(empModelResult);
+                });
+                
+                // 计算该型号整体统计数据
+                if (validSamples.length > 0) {
+                    const totalTime = validSamples.reduce((sum, sample) => sum + sample.timeDiff, 0);
+                    const avgTime = totalTime / validSamples.length;
+                    
+                    // 计算中位数
+                    const sortedTimes = validSamples.map(sample => sample.timeDiff).sort((a, b) => a - b);
+                    const medianIndex = Math.floor(sortedTimes.length / 2);
+                    const medianTime = sortedTimes.length % 2 === 0 
+                        ? (sortedTimes[medianIndex-1] + sortedTimes[medianIndex]) / 2 
+                        : sortedTimes[medianIndex];
+                    
+                    resultsByModel[model] = {
+                        model,
+                        process: selectedProcess,
+                        avgTime,
+                        medianTime,
+                        minTime: Math.min(...sortedTimes),
+                        maxTime: Math.max(...sortedTimes),
+                        validCount: validSamples.length,
+                        outlierCount: samples.length - validSamples.length,
+                        crossDayCount: samples.filter(sample => sample.isCrossDay).length,
+                        outOfRangeCount: samples.filter(sample => !sample.isCrossDay && sample.isOutlier).length,
+                        employees: Object.values(samplesByEmployee).map(emp => emp.employee)
+                    };
+                }
+            });
+            
+            // 汇总结果
+            const timingResults = [];
+            
+            // 添加型号整体结果
+            Object.values(resultsByModel).forEach(modelResult => {
+                timingResults.push({
+                    employee: '整体平均',
+                    process: selectedProcess,
+                    model: modelResult.model,
+                    avgTime: modelResult.avgTime,
+                    medianTime: modelResult.medianTime,
+                    minTime: modelResult.minTime,
+                    maxTime: modelResult.maxTime,
+                    validCount: modelResult.validCount,
+                    outlierCount: modelResult.outlierCount,
+                    crossDayCount: modelResult.crossDayCount,
+                    outOfRangeCount: modelResult.outOfRangeCount,
+                    isModelAvg: true
+                });
+            });
+            
+            // 添加员工-型号结果
+            Object.values(resultsByEmployee).forEach(empResults => {
+                empResults.forEach(result => {
+                    timingResults.push({
+                        employee: result.employee,
+                        process: selectedProcess,
+                        model: result.model,
+                        avgTime: result.avgTime,
+                        medianTime: result.medianTime,
+                        minTime: result.minTime,
+                        maxTime: result.maxTime,
+                        validCount: result.validCount,
+                        outlierCount: result.outlierCount,
+                        crossDayCount: result.crossDayCount,
+                        outOfRangeCount: result.outOfRangeCount,
+                        isModelAvg: false
+                    });
+                });
+            });
+            
+            // 显示工序时间表格
+            displayTimingTable(timingResults);
+            
+            // 显示工序时间统计
+            displayTimingStats(timingResults);
+            
+            // 显示工序时间图表
+            displayTimingChart(timingResults);
+            
+            document.getElementById('loading').style.display = 'none';
+        }
+        
+        // 显示工序时间表格
+        function displayTimingTable(timingResults) {
+            const tableBody = document.getElementById('timing-table').querySelector('tbody');
+            tableBody.innerHTML = '';
+            
+            // 更新表头，添加跨天样本和超出范围样本列
+            const tableHeader = document.getElementById('timing-table').querySelector('thead tr');
+            // 确保表头有正确的列
+            tableHeader.innerHTML = `
+                <th data-sort="employee">员工</th>
+                <th data-sort="process">工序</th>
+                <th data-sort="model">产品型号</th>
+                <th data-sort="avgTime">平均时间(秒)</th>
+                <th data-sort="medianTime">中位数时间</th>
+                <th data-sort="validCount">有效样本</th>
+                <th data-sort="crossDayCount">跨天样本</th>
+                <th data-sort="outOfRangeCount">超范围样本</th>
+            `;
+            
+            if (timingResults.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="8" style="text-align: center;">没有找到符合条件的数据</td></tr>';
+                return;
+            }
+            
+            // 按产品型号分组排序
+            timingResults.sort((a, b) => {
+                // 首先按产品型号排序
+                if (a.model !== b.model) {
+                    return a.model.localeCompare(b.model);
+                }
+                
+                // 同一型号内，整体平均排在最前面
+                if (a.isModelAvg && !b.isModelAvg) return -1;
+                if (!a.isModelAvg && b.isModelAvg) return 1;
+                
+                // 其他情况按平均时间排序
+                return a.avgTime - b.avgTime;
+            });
+            
+            let currentModel = null;
+            
+            timingResults.forEach(result => {
+                const row = document.createElement('tr');
+                
+                // 为型号总体结果添加不同的样式
+                if (result.isModelAvg) {
+                    row.style.backgroundColor = '#f0f8ff';
+                    row.style.fontWeight = 'bold';
+                }
+                
+                // 如果进入新的产品型号，添加一个分隔行
+                if (currentModel !== result.model) {
+                    currentModel = result.model;
+                    const separatorRow = document.createElement('tr');
+                    separatorRow.innerHTML = `<td colspan="8" style="background-color: #e9ecef; text-align: center; font-weight: bold;">${result.model}</td>`;
+                    tableBody.appendChild(separatorRow);
+                }
+                
+                row.innerHTML = `
+                    <td>${result.employee}</td>
+                    <td>${result.process}</td>
+                    <td>${result.model}</td>
+                    <td>${result.avgTime.toFixed(1)}</td>
+                    <td>${result.medianTime.toFixed(1)}</td>
+                    <td>${result.validCount}</td>
+                    <td>${result.crossDayCount || 0}</td>
+                    <td>${result.outOfRangeCount || 0}</td>
+                `;
+                
+                tableBody.appendChild(row);
+            });
+        }
+        
+        // 显示工序时间统计
+        function displayTimingStats(timingResults) {
+            // 如果没有结果，清空统计
+            if (timingResults.length === 0) {
+                document.getElementById('avg-time').textContent = '-';
+                document.getElementById('min-time').textContent = '-';
+                document.getElementById('max-time').textContent = '-';
+                document.getElementById('sample-count').textContent = '-';
+                document.getElementById('outlier-count').textContent = '-';
+                return;
+            }
+            
+            // 筛选型号平均记录
+            const modelAverages = timingResults.filter(result => result.isModelAvg);
+            
+            if (modelAverages.length === 0) return;
+            
+            // 计算所有型号的总体平均时间
+            let totalTime = 0;
+            let totalSamples = 0;
+            let totalOutliers = 0;
+            let totalCrossDays = 0;
+            let totalOutOfRange = 0;
+            let minTime = Infinity;
+            let maxTime = 0;
+            
+            modelAverages.forEach(result => {
+                totalTime += result.avgTime * result.validCount;
+                totalSamples += result.validCount;
+                totalOutliers += result.outlierCount;
+                totalCrossDays += result.crossDayCount || 0;
+                totalOutOfRange += result.outOfRangeCount || 0;
+                minTime = Math.min(minTime, result.minTime);
+                maxTime = Math.max(maxTime, result.maxTime);
+            });
+            
+            const overallAvgTime = totalTime / totalSamples;
+            
+            // 更新统计显示
+            document.getElementById('avg-time').textContent = `${overallAvgTime.toFixed(1)} 秒`;
+            document.getElementById('min-time').textContent = `${minTime.toFixed(1)} 秒`;
+            document.getElementById('max-time').textContent = `${maxTime.toFixed(1)} 秒`;
+            document.getElementById('sample-count').textContent = totalSamples;
+            
+            // 更新异常值显示
+            // 创建异常值详细信息
+            const outlierDetail = `总计: ${totalOutliers} (跨天: ${totalCrossDays}, 超范围: ${totalOutOfRange})`;
+            document.getElementById('outlier-count').innerHTML = outlierDetail;
+            
+            // 添加有效率显示
+            const validRateElement = document.getElementById('timing-stats').querySelector('.stat-card:last-child .stat-value');
+            if (validRateElement) {
+                const validRate = (totalSamples / (totalSamples + totalOutliers) * 100).toFixed(1);
+                validRateElement.textContent = `${validRate}%`;
+            }
+        }
+        
+        // 显示工序时间图表
+        function displayTimingChart(timingResults) {
+            const ctx = document.getElementById('timing-chart').getContext('2d');
+            
+            // 如果没有结果，清空图表
+            if (timingResults.length === 0) {
+                if (timingChart) {
+                    timingChart.destroy();
+                    timingChart = null;
+                }
+                return;
+            }
+            
+            // 筛选有足够样本的型号平均结果（至少3个有效样本）
+            const modelAverages = timingResults.filter(result => result.isModelAvg && result.validCount >= 3);
+            
+            if (modelAverages.length === 0) {
+                // 如果没有满足条件的型号平均，则回退到之前的按员工展示
+                const validResults = timingResults.filter(result => !result.isModelAvg && result.validCount >= 3);
+                
+                if (validResults.length === 0) {
+                    if (timingChart) {
+                        timingChart.destroy();
+                        timingChart = null;
+                    }
+                    return;
+                }
+                
+                // 准备图表数据
+                const labels = validResults.map(result => `${result.employee} (${result.model})`);
+                const avgTimes = validResults.map(result => result.avgTime);
+                const medianTimes = validResults.map(result => result.medianTime);
+                const sampleCounts = validResults.map(result => result.validCount);
+                const crossDayCounts = validResults.map(result => result.crossDayCount || 0);
+                const outOfRangeCounts = validResults.map(result => result.outOfRangeCount || 0);
+                
+                // 如果已存在图表，销毁它
+                if (timingChart) {
+                    timingChart.destroy();
+                }
+                
+                // 创建新图表 - 员工视图
+                timingChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: '平均时间 (秒)',
+                            data: avgTimes,
+                            backgroundColor: 'rgba(255, 99, 132, 0.5)',
+                            borderColor: 'rgb(255, 99, 132)',
+                            borderWidth: 1
+                        }, {
+                            label: '中位数时间 (秒)',
+                            data: medianTimes,
+                            backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                            borderColor: 'rgb(54, 162, 235)',
+                            borderWidth: 1
+                        }, {
+                            label: '有效样本',
+                            data: sampleCounts,
+                            type: 'line',
+                            fill: false,
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            tension: 0.1,
+                            yAxisID: 'y1'
+                        }, {
+                            label: '跨天样本',
+                            data: crossDayCounts,
+                            type: 'line',
+                            fill: false,
+                            borderColor: 'rgba(255, 159, 64, 1)',
+                            borderDash: [5, 5],
+                            tension: 0.1,
+                            yAxisID: 'y1'
+                        }, {
+                            label: '超范围样本',
+                            data: outOfRangeCounts,
+                            type: 'line',
+                            fill: false,
+                            borderColor: 'rgba(153, 102, 255, 1)',
+                            borderDash: [3, 3],
+                            tension: 0.1,
+                            yAxisID: 'y1'
+                        }]
+                    },
+                    options: {
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: '时间 (秒)'
+                                }
+                            },
+                            y1: {
+                                position: 'right',
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: '样本数量'
+                                },
+                                grid: {
+                                    drawOnChartArea: false
+                                }
+                            }
+                        },
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: `${document.getElementById('timing-process').value}工序时间分析 (按员工)`
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    afterLabel: function(context) {
+                                        const index = context.dataIndex;
+                                        const result = validResults[index];
+                                        return [
+                                            `有效样本: ${result.validCount}`, 
+                                            `跨天样本: ${result.crossDayCount || 0}`,
+                                            `超范围样本: ${result.outOfRangeCount || 0}`,
+                                            `有效率: ${(result.validCount / (result.validCount + result.outlierCount) * 100).toFixed(1)}%`
+                                        ];
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            } else {
+                // 如果有足够的型号平均数据，创建按产品型号的图表
+                // 准备图表数据
+                const labels = modelAverages.map(result => result.model);
+                const avgTimes = modelAverages.map(result => result.avgTime);
+                const medianTimes = modelAverages.map(result => result.medianTime);
+                const sampleCounts = modelAverages.map(result => result.validCount);
+                const crossDayCounts = modelAverages.map(result => result.crossDayCount || 0);
+                const outOfRangeCounts = modelAverages.map(result => result.outOfRangeCount || 0);
+                
+                // 如果已存在图表，销毁它
+                if (timingChart) {
+                    timingChart.destroy();
+                }
+                
+                // 创建新图表 - 型号视图
+                timingChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: '平均时间 (秒)',
+                            data: avgTimes,
+                            backgroundColor: 'rgba(255, 99, 132, 0.5)',
+                            borderColor: 'rgb(255, 99, 132)',
+                            borderWidth: 1
+                        }, {
+                            label: '中位数时间 (秒)',
+                            data: medianTimes,
+                            backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                            borderColor: 'rgb(54, 162, 235)',
+                            borderWidth: 1
+                        }, {
+                            label: '有效样本',
+                            data: sampleCounts,
+                            type: 'line',
+                            fill: false,
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            tension: 0.1,
+                            yAxisID: 'y1'
+                        }, {
+                            label: '跨天样本',
+                            data: crossDayCounts,
+                            type: 'line',
+                            fill: false,
+                            borderColor: 'rgba(255, 159, 64, 1)',
+                            borderDash: [5, 5],
+                            tension: 0.1,
+                            yAxisID: 'y1'
+                        }, {
+                            label: '超范围样本',
+                            data: outOfRangeCounts,
+                            type: 'line',
+                            fill: false,
+                            borderColor: 'rgba(153, 102, 255, 1)',
+                            borderDash: [3, 3],
+                            tension: 0.1,
+                            yAxisID: 'y1'
+                        }]
+                    },
+                    options: {
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: '时间 (秒)'
+                                }
+                            },
+                            y1: {
+                                position: 'right',
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: '样本数量'
+                                },
+                                grid: {
+                                    drawOnChartArea: false
+                                }
+                            }
+                        },
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: `${document.getElementById('timing-process').value}工序时间分析 (按产品型号)`
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    afterLabel: function(context) {
+                                        const index = context.dataIndex;
+                                        const result = modelAverages[index];
+                                        return [
+                                            `有效样本: ${result.validCount}`, 
+                                            `跨天样本: ${result.crossDayCount || 0}`,
+                                            `超范围样本: ${result.outOfRangeCount || 0}`,
+                                            `有效率: ${(result.validCount / (result.validCount + result.outlierCount) * 100).toFixed(1)}%`
+                                        ];
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
         }
     </script>
 </body>
