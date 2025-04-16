@@ -485,6 +485,7 @@
                     <option value="绕线">绕线</option>
                     <option value="嵌线">嵌线</option>
                     <option value="接线">接线</option>
+                    <option value="嵌线/接线">嵌线/接线</option>
                     <option value="压装">压装</option>
                     <option value="成品检验">成品检验</option>
                 </select>
@@ -512,6 +513,11 @@
             
             <div class="export-settings">
                 <label><input type="checkbox" class="export-checkbox" id="export-details" checked> 包含产品详情</label>
+            </div>
+            
+            <!-- 添加特殊工序说明 -->
+            <div class="process-note" style="margin-top: 10px; color: #666; font-size: 0.9em;">
+                <strong>注意：</strong>"嵌线/接线"表示某些工艺中这两个工序只需完成其中一个即视为完成此阶段。筛选此项会包含任一工序完成的产品。
             </div>
         </div>
         
@@ -679,8 +685,9 @@
                                 <option value="绕线">绕线</option>
                                 <option value="嵌线">嵌线</option>
                                 <option value="接线">接线</option>
+                                <option value="嵌线/接线">嵌线/接线</option>
                                 <option value="压装">压装</option>
-                                <option value="车止口">车止口</option>
+                                <option value="成品检验">成品检验</option>
                             </select>
                         </div>
                         <div class="filter-group">
@@ -1050,11 +1057,12 @@
                 const statistics = [];
                 
                 // 所有可能的工序及其对应的时间字段
-                const allProcesses = ['绕线', '嵌线', '接线', '压装', '半成品检验', '浸漆', '车止口', '成品检验'];
+                const allProcesses = ['绕线', '嵌线', '接线', '嵌线/接线', '压装', '半成品检验', '浸漆', '车止口', '成品检验'];
                 const processTimeFields = {
                     '绕线': '绕线时间',
                     '嵌线': '嵌线时间',
                     '接线': '接线时间',
+                    '嵌线/接线': null, // 特殊处理：嵌线或接线完成一个即可
                     '压装': '压装时间',
                     '半成品检验': '半成品检验时间',
                     '浸漆': '浸漆时间',
@@ -1062,6 +1070,11 @@
                     '成品检验': '成品检验时间'
                 };
                 
+                // 特殊工序组合映射
+                const processGroups = {
+                    '嵌线/接线': ['嵌线', '接线']
+                };
+
                 // 创建一个用于存储在制品数据的数组
                 const wipStatistics = [];
                 
@@ -1110,11 +1123,29 @@
                         // 从后往前检查已完成的工序
                         for (let i = processes.length - 1; i >= 0; i--) {
                             const process = processes[i];
-                            const timeField = processTimeFields[process];
-                            if (timeField && product[timeField]) {
-                                // 找到已完成的最后一道工序
-                                currentStage = process;
-                                break;
+                            
+                            // 处理组合工序（如"嵌线/接线"）
+                            if (processGroups[process]) {
+                                const subProcesses = processGroups[process];
+                                // 检查是否有任一子工序已完成
+                                const completed = subProcesses.some(subProcess => {
+                                    const subTimeField = processTimeFields[subProcess];
+                                    return subTimeField && product[subTimeField];
+                                });
+                                
+                                if (completed) {
+                                    // 使用组合工序名称
+                                    currentStage = process;
+                                    break;
+                                }
+                            } else {
+                                // 普通工序处理
+                                const timeField = processTimeFields[process];
+                                if (timeField && product[timeField]) {
+                                    // 找到已完成的最后一道工序
+                                    currentStage = process;
+                                    break;
+                                }
                             }
                         }
                         
@@ -1128,15 +1159,53 @@
                         
                         // 统计各工序的完成情况
                         processes.forEach(process => {
-                            const timeField = processTimeFields[process];
-                            if (timeField && product[timeField]) {
-                                processCounts[process]++;
-                                
-                                // 存储完成时间戳
-                                processTimestamps[process].push({
-                                    timestamp: product[timeField],
-                                    productCode: product.产品编码
+                            // 处理组合工序情况
+                            if (processGroups[process]) {
+                                const subProcesses = processGroups[process];
+                                // 检查是否有任一子工序已完成
+                                const completed = subProcesses.some(subProcess => {
+                                    const subTimeField = processTimeFields[subProcess];
+                                    return subTimeField && product[subTimeField];
                                 });
+                                
+                                if (completed) {
+                                    processCounts[process]++;
+                                    
+                                    // 对于组合工序，记录最早完成的子工序的时间戳
+                                    let earliestTimestamp = null;
+                                    let completedSubProcess = null;
+                                    
+                                    subProcesses.forEach(subProcess => {
+                                        const subTimeField = processTimeFields[subProcess];
+                                        if (subTimeField && product[subTimeField]) {
+                                            const timestamp = new Date(product[subTimeField]);
+                                            if (!earliestTimestamp || timestamp < earliestTimestamp) {
+                                                earliestTimestamp = timestamp;
+                                                completedSubProcess = subProcess;
+                                            }
+                                        }
+                                    });
+                                    
+                                    if (earliestTimestamp) {
+                                        processTimestamps[process].push({
+                                            timestamp: earliestTimestamp,
+                                            productCode: product.产品编码,
+                                            subProcess: completedSubProcess // 记录实际完成的子工序
+                                        });
+                                    }
+                                }
+                            } else {
+                                // 普通工序处理
+                                const timeField = processTimeFields[process];
+                                if (timeField && product[timeField]) {
+                                    processCounts[process]++;
+                                    
+                                    // 存储完成时间戳
+                                    processTimestamps[process].push({
+                                        timestamp: product[timeField],
+                                        productCode: product.产品编码
+                                    });
+                                }
                             }
                         });
                     });
@@ -1159,7 +1228,8 @@
                         completionRate,
                         completionRateValue,
                         processCounts,
-                        processTimestamps
+                        processTimestamps,
+                        processGroups // 添加工序组关系信息
                     });
                     
                     // 添加到在制品统计
@@ -1278,7 +1348,28 @@
                 if (selectedProcess) {
                     filteredStatistics = filteredStatistics.filter(stat => {
                         // 检查该型号是否有该工序
-                        if (!stat.processCounts || !stat.processCounts[selectedProcess]) {
+                        if (!stat.processCounts) {
+                            return false;
+                        }
+                        
+                        // 处理组合工序情况
+                        if (stat.processGroups && stat.processGroups[selectedProcess]) {
+                            // 对于组合工序，检查是否有任一子工序存在
+                            const subProcesses = stat.processGroups[selectedProcess];
+                            const hasAnySubProcess = subProcesses.some(subProcess => 
+                                stat.processCounts && typeof stat.processCounts[subProcess] !== 'undefined'
+                            );
+                            
+                            if (hasAnySubProcess) {
+                                // 如果存在组合工序，添加特殊筛选信息
+                                stat.processFilterInfo = `${selectedProcess}: ${stat.processCounts[selectedProcess] || 0}`;
+                                return true;
+                            }
+                            return false;
+                        } 
+                        
+                        // 常规工序处理
+                        if (!stat.processCounts[selectedProcess]) {
                             return false;
                         }
                         
@@ -1320,7 +1411,26 @@
                         // 如果选择了工序，使用该工序的时间戳筛选
                         const processToCheck = selectedProcess || Object.keys(stat.processCounts || {}).pop();
                         
-                        if (!processToCheck || !stat.processTimestamps || !stat.processTimestamps[processToCheck]) {
+                        if (!processToCheck || !stat.processTimestamps) {
+                            return false;
+                        }
+                        
+                        // 处理组合工序情况
+                        if (stat.processGroups && stat.processGroups[processToCheck]) {
+                            // 组合工序特殊处理：检查任一子工序是否有符合日期条件的记录
+                            if (!stat.processTimestamps[processToCheck]) {
+                                return false;
+                            }
+                            
+                            return stat.processTimestamps[processToCheck].some(item => {
+                                const timestamp = new Date(item.timestamp);
+                                return (!startDate || timestamp >= startDate) && 
+                                       (!endDate || timestamp <= endDate);
+                            });
+                        }
+                        
+                        // 常规工序处理
+                        if (!stat.processTimestamps[processToCheck]) {
                             return false;
                         }
                         
@@ -1353,7 +1463,23 @@
                                 if (startDate) dateRangeInfo.push(startDate.toLocaleDateString());
                                 if (endDate) dateRangeInfo.push(endDate.toLocaleDateString());
                                 
-                                stat.processFilterInfo = `${selectedProcess}: ${inRangeCount} (${dateRangeInfo.join(' - ')})`;
+                                // 添加子工序信息（对于组合工序）
+                                if (stat.processGroups && stat.processGroups[selectedProcess]) {
+                                    const subProcessCounts = {};
+                                    stat.processTimestamps[selectedProcess].forEach(item => {
+                                        if (item.subProcess) {
+                                            subProcessCounts[item.subProcess] = (subProcessCounts[item.subProcess] || 0) + 1;
+                                        }
+                                    });
+                                    
+                                    const subProcessInfo = Object.entries(subProcessCounts)
+                                        .map(([subProcess, count]) => `${subProcess}:${count}`)
+                                        .join('/');
+                                    
+                                    stat.processFilterInfo = `${selectedProcess}(${subProcessInfo}): ${inRangeCount} (${dateRangeInfo.join(' - ')})`;
+                                } else {
+                                    stat.processFilterInfo = `${selectedProcess}: ${inRangeCount} (${dateRangeInfo.join(' - ')})`;
+                                }
                             }
                         });
                     }
