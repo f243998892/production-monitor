@@ -137,12 +137,14 @@
             display: flex;
             flex-wrap: wrap;
             gap: 15px;
-            align-items: center;
+            align-items: flex-start;
+            justify-content: space-between;
         }
         .filter-group {
             display: flex;
             flex-direction: column;
-            min-width: 200px;
+            min-width: 180px;
+            margin-bottom: 10px;
         }
         .filter-group label {
             margin-bottom: 5px;
@@ -153,13 +155,34 @@
             padding: 8px;
             border-radius: 4px;
             border: 1px solid #ddd;
+            width: 100%;
         }
+        
+        .filter-item {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        
+        .date-filter {
+            padding: 6px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
         #searchInput {
             padding: 8px;
             border-radius: 4px;
             border: 1px solid #ddd;
             width: 100%;
-            max-width: 300px;
         }
         .clearFilters {
             background-color: #f44336;
@@ -177,22 +200,26 @@
         
         .tab-button {
             padding: 10px 20px;
-            background-color: #f8f8f8;
+            background-color: #e8e8e8;
+            color: #555;
             border: 1px solid #ddd;
             border-bottom: none;
             border-radius: 4px 4px 0 0;
             margin-right: 5px;
             cursor: pointer;
+            font-weight: 500;
         }
         
         .tab-button:hover {
-            background-color: #e8e8e8;
+            background-color: #d8d8d8;
+            color: #333;
         }
         
         .tab-button.active {
             background-color: #4CAF50;
             color: white;
             border-color: #4CAF50;
+            font-weight: bold;
         }
         
         .tab-pane {
@@ -468,28 +495,6 @@
                 <input type="text" id="searchInput" placeholder="输入关键字搜索...">
             </div>
             
-            <div class="filter-group">
-                <button id="applyFilters">应用筛选</button>
-                <button id="clearFilters" class="clearFilters">清除筛选</button>
-            </div>
-            
-            <!-- 刷新设置 -->
-            <div class="filter-group">
-                <label for="refreshInterval">自动刷新频率</label>
-                <select id="refreshInterval">
-                    <option value="0">关闭自动刷新</option>
-                    <option value="30">30秒</option>
-                    <option value="60" selected>1分钟</option>
-                    <option value="300">5分钟</option>
-                    <option value="600">10分钟</option>
-                    <option value="1800">30分钟</option>
-                </select>
-            </div>
-            
-            <div class="filter-group">
-                <button id="saveRefreshSettings">保存刷新设置</button>
-            </div>
-            
             <!-- 新增日期范围筛选 -->
             <div class="filter-item">
                 <label for="date-start">日期范围：</label>
@@ -497,10 +502,20 @@
                 <span>至</span>
                 <input type="date" id="date-end" class="date-filter">
             </div>
+            
+            <div class="action-buttons">
+                <button id="applyFilters">应用筛选</button>
+                <button id="clearFilters" class="clearFilters">清除筛选</button>
+                <button id="refresh-btn">立即刷新</button>
+                <button id="export-excel">导出Excel</button>
+            </div>
+            
+            <div class="export-settings">
+                <label><input type="checkbox" class="export-checkbox" id="export-details" checked> 包含产品详情</label>
+            </div>
         </div>
         
         <div class="status">
-            <button id="refresh-btn">立即刷新</button>
             <span class="last-updated" id="last-updated">最后更新: -</span>
             <div class="cache-status" id="cache-status">缓存状态: 未加载</div>
         </div>
@@ -702,7 +717,7 @@
                             </div>
                             <div class="stat-card">
                                 <h3>异常值数量</h3>
-                                <div id="outlier-count" class="stat-value">-</div>
+                                <div id="outlier-count"></div>
                             </div>
                         </div>
                         
@@ -712,8 +727,8 @@
                                     <th data-sort="employee">员工</th>
                                     <th data-sort="process">工序</th>
                                     <th data-sort="model">产品型号</th>
-                                    <th data-sort="avgTime">平均时间(秒)</th>
-                                    <th data-sort="medianTime">中位数时间</th>
+                                    <th data-sort="avgTime">平均时间(小时)</th>
+                                    <th data-sort="medianTime">中位数时间(小时)</th>
                                     <th data-sort="validCount">有效样本</th>
                                     <th data-sort="crossDayCount">跨天样本</th>
                                     <th data-sort="outOfRangeCount">超范围样本</th>
@@ -937,47 +952,6 @@
                     }
                 });
             });
-
-            // 刷新相关变量和函数
-            let refreshIntervalId = null;
-            const refreshIntervalSelect = document.getElementById('refreshInterval');
-            const saveRefreshSettingsBtn = document.getElementById('saveRefreshSettings');
-            
-            // 创建和添加刷新状态元素
-            const refreshStatusSpan = document.createElement('span');
-            refreshStatusSpan.id = 'refreshStatus';
-            refreshStatusSpan.textContent = '自动刷新未设置';
-            document.querySelector('.status').appendChild(refreshStatusSpan);
-
-            // 保存刷新设置
-            saveRefreshSettingsBtn.addEventListener('click', function() {
-                updateRefreshInterval();
-            });
-
-            function updateRefreshInterval() {
-                // 清除现有的定时器
-                if (refreshIntervalId) {
-                    clearInterval(refreshIntervalId);
-                    refreshIntervalId = null;
-                }
-                
-                // 获取选定的刷新间隔（秒）
-                const intervalSeconds = parseInt(refreshIntervalSelect.value);
-                
-                // 设置新的定时器（如果间隔不为0）
-                if (intervalSeconds > 0) {
-                    refreshIntervalId = setInterval(() => fetchProductionData(true), intervalSeconds * 1000);
-                    console.log(`已设置自动刷新，频率为 ${intervalSeconds} 秒`);
-                    
-                    // 更新状态显示
-                    document.getElementById('refreshStatus').textContent = 
-                        `自动刷新已启用: 每 ${intervalSeconds} 秒`;
-                } else {
-                    // 更新状态显示
-                    document.getElementById('refreshStatus').textContent = '自动刷新已关闭';
-                    console.log('自动刷新已关闭');
-                }
-            }
 
             // 从Supabase获取数据并处理
             async function fetchProductionData(forceRefresh = false) {
@@ -1558,17 +1532,6 @@
             // 页面加载完成后立即获取数据
             fetchProductionData();
             
-            // 添加Excel导出按钮到筛选面板
-            const exportGroup = document.createElement('div');
-            exportGroup.className = 'filter-group';
-            exportGroup.innerHTML = `
-                <button id="export-excel">导出Excel</button>
-                <div class="export-settings">
-                    <label><input type="checkbox" class="export-checkbox" id="export-details" checked> 包含产品详情</label>
-                </div>
-            `;
-            document.querySelector('.filter-panel').appendChild(exportGroup);
-            
             // 绑定Excel导出事件
             document.getElementById('export-excel').addEventListener('click', function() {
                 if (!window.exportData) {
@@ -1583,12 +1546,6 @@
                 });
             });
             
-            // 从localStorage恢复刷新设置
-            const savedInterval = localStorage.getItem('refreshInterval');
-            if (savedInterval) {
-                refreshIntervalSelect.value = savedInterval;
-                updateRefreshInterval();
-            }
         };
 
         // 加载并初始化应用
@@ -3273,10 +3230,10 @@
                     
                     // 计算员工在该型号上的平均时间
                     const totalTime = validEmpSamples.reduce((sum, sample) => sum + sample.timeDiff, 0);
-                    const avgTime = totalTime / validEmpSamples.length;
+                    const avgTime = totalTime / validEmpSamples.length / 3600; // 转换为小时
                     
                     // 计算中位数
-                    const sortedTimes = validEmpSamples.map(sample => sample.timeDiff).sort((a, b) => a - b);
+                    const sortedTimes = validEmpSamples.map(sample => sample.timeDiff / 3600).sort((a, b) => a - b); // 转换为小时
                     const medianIndex = Math.floor(sortedTimes.length / 2);
                     const medianTime = sortedTimes.length % 2 === 0 
                         ? (sortedTimes[medianIndex-1] + sortedTimes[medianIndex]) / 2 
@@ -3306,10 +3263,10 @@
                 // 计算该型号整体统计数据
                 if (validSamples.length > 0) {
                     const totalTime = validSamples.reduce((sum, sample) => sum + sample.timeDiff, 0);
-                    const avgTime = totalTime / validSamples.length;
+                    const avgTime = totalTime / validSamples.length / 3600; // 转换为小时
                     
                     // 计算中位数
-                    const sortedTimes = validSamples.map(sample => sample.timeDiff).sort((a, b) => a - b);
+                    const sortedTimes = validSamples.map(sample => sample.timeDiff / 3600).sort((a, b) => a - b); // 转换为小时
                     const medianIndex = Math.floor(sortedTimes.length / 2);
                     const medianTime = sortedTimes.length % 2 === 0 
                         ? (sortedTimes[medianIndex-1] + sortedTimes[medianIndex]) / 2 
@@ -3396,8 +3353,8 @@
                 <th data-sort="employee">员工</th>
                 <th data-sort="process">工序</th>
                 <th data-sort="model">产品型号</th>
-                <th data-sort="avgTime">平均时间(秒)</th>
-                <th data-sort="medianTime">中位数时间</th>
+                <th data-sort="avgTime">平均时间(小时)</th>
+                <th data-sort="medianTime">中位数时间(小时)</th>
                 <th data-sort="validCount">有效样本</th>
                 <th data-sort="crossDayCount">跨天样本</th>
                 <th data-sort="outOfRangeCount">超范围样本</th>
@@ -3496,9 +3453,9 @@
             const overallAvgTime = totalTime / totalSamples;
             
             // 更新统计显示
-            document.getElementById('avg-time').textContent = `${overallAvgTime.toFixed(1)} 秒`;
-            document.getElementById('min-time').textContent = `${minTime.toFixed(1)} 秒`;
-            document.getElementById('max-time').textContent = `${maxTime.toFixed(1)} 秒`;
+            document.getElementById('avg-time').textContent = `${overallAvgTime.toFixed(2)} 小时`;
+            document.getElementById('min-time').textContent = `${minTime.toFixed(2)} 小时`;
+            document.getElementById('max-time').textContent = `${maxTime.toFixed(2)} 小时`;
             document.getElementById('sample-count').textContent = totalSamples;
             
             // 更新异常值显示
@@ -3561,13 +3518,13 @@
                     data: {
                         labels: labels,
                         datasets: [{
-                            label: '平均时间 (秒)',
+                            label: '平均时间 (小时)',
                             data: avgTimes,
                             backgroundColor: 'rgba(255, 99, 132, 0.5)',
                             borderColor: 'rgb(255, 99, 132)',
                             borderWidth: 1
                         }, {
-                            label: '中位数时间 (秒)',
+                            label: '中位数时间 (小时)',
                             data: medianTimes,
                             backgroundColor: 'rgba(54, 162, 235, 0.5)',
                             borderColor: 'rgb(54, 162, 235)',
@@ -3606,7 +3563,7 @@
                                 beginAtZero: true,
                                 title: {
                                     display: true,
-                                    text: '时间 (秒)'
+                                    text: '时间 (小时)'
                                 }
                             },
                             y1: {
@@ -3664,13 +3621,13 @@
                     data: {
                         labels: labels,
                         datasets: [{
-                            label: '平均时间 (秒)',
+                            label: '平均时间 (小时)',
                             data: avgTimes,
                             backgroundColor: 'rgba(255, 99, 132, 0.5)',
                             borderColor: 'rgb(255, 99, 132)',
                             borderWidth: 1
                         }, {
-                            label: '中位数时间 (秒)',
+                            label: '中位数时间 (小时)',
                             data: medianTimes,
                             backgroundColor: 'rgba(54, 162, 235, 0.5)',
                             borderColor: 'rgb(54, 162, 235)',
@@ -3709,7 +3666,7 @@
                                 beginAtZero: true,
                                 title: {
                                     display: true,
-                                    text: '时间 (秒)'
+                                    text: '时间 (小时)'
                                 }
                             },
                             y1: {
