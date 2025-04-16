@@ -614,6 +614,14 @@
                 
                 <!-- 在制品视图 -->
                 <div id="wip-tab" class="tab-pane">
+                    <div style="margin-bottom: 15px; padding: 10px; background-color: #f8f9fa; border-left: 4px solid #4CAF50; border-radius: 4px;">
+                        <p style="margin: 0; color: #555;"><strong>在制品说明：</strong></p>
+                        <ol style="margin: 5px 0 0 20px; padding: 0;">
+                            <li>已完成当前工序的产品会自动转移到下一工序状态</li>
+                            <li>已完成最后一道工序的产品不会显示在在制品中</li>
+                            <li>表格中标记为"-"的工序表示该型号的工艺路线中不包含此工序</li>
+                        </ol>
+                    </div>
                     <table id="wip-statistics">
                         <thead>
                             <tr>
@@ -1118,10 +1126,11 @@
                     
                     // 计算各工序完成数量
                     products.forEach(product => {
-                        // 找出该产品当前所处的工序阶段
-                        let currentStage = null;
-                        // 从后往前检查已完成的工序
-                        for (let i = processes.length - 1; i >= 0; i--) {
+                        // 找出该产品当前所处的工序阶段（在制品使用下一个待处理的工序）
+                        let lastCompletedIndex = -1; // 最后完成的工序索引
+                        
+                        // 检查工艺路线中的工序完成情况
+                        for (let i = 0; i < processes.length; i++) {
                             const process = processes[i];
                             
                             // 处理组合工序（如"嵌线/接线"）
@@ -1134,30 +1143,36 @@
                                 });
                                 
                                 if (completed) {
-                                    // 使用组合工序名称
-                                    currentStage = process;
-                                    break;
+                                    // 记录完成的工序索引
+                                    lastCompletedIndex = i;
                                 }
                             } else {
                                 // 普通工序处理
                                 const timeField = processTimeFields[process];
                                 if (timeField && product[timeField]) {
-                                    // 找到已完成的最后一道工序
-                                    currentStage = process;
-                                    break;
+                                    // 记录完成的工序索引
+                                    lastCompletedIndex = i;
                                 }
                             }
                         }
                         
-                        // 如果没有找到任何已完成工序，则视为未开始
-                        if (currentStage === null) {
+                        // 确定当前工序状态
+                        if (lastCompletedIndex === -1) {
+                            // 未开始任何工序
                             notStartedCount++;
+                        } else if (lastCompletedIndex === processes.length - 1) {
+                            // 已完成所有工序，不计入在制品
                         } else {
-                            // 增加该阶段的计数
-                            processStageCount[currentStage] = (processStageCount[currentStage] || 0) + 1;
+                            // 已完成某个工序，状态应为下一工序
+                            const nextProcessIndex = lastCompletedIndex + 1;
+                            const nextProcess = processes[nextProcessIndex];
+                            
+                            if (nextProcess) {
+                                processStageCount[nextProcess] = (processStageCount[nextProcess] || 0) + 1;
+                            }
                         }
                         
-                        // 统计各工序的完成情况
+                        // 统计各工序的完成情况 - 不需要修改这部分，仍然统计已完成的工序数
                         processes.forEach(process => {
                             // 处理组合工序情况
                             if (processGroups[process]) {
@@ -2428,7 +2443,7 @@
             // 如果没有数据，返回
             if (filteredWip.length === 0) return;
             
-            // 收集所有可能的工序名称
+            // 收集所有可能的工序名称，但只包含每个产品型号的工艺路线中的工序
             const allProcessNames = new Set();
             filteredWip.forEach(item => {
                 if (item.processList) {
@@ -2439,7 +2454,7 @@
             // 将工序名称转换为数组并排序
             const sortedProcesses = Array.from(allProcessNames).sort();
             
-            // 准备导出数据 - 在制品视图不显示百分比
+            // 准备导出数据
             const exportData = filteredWip.map(item => {
                 const row = {
                     '产品型号': item.model,
@@ -2448,10 +2463,16 @@
                     '未开始': item.notStarted
                 };
                 
-                // 添加各工序状态，只显示数量，不显示百分比
+                // 添加各工序状态，只包含该型号工艺路线中的工序
                 sortedProcesses.forEach(process => {
-                    const count = item.processStages[process] || 0;
-                    row[process] = count;
+                    // 检查此工序是否在该型号的工艺路线中
+                    if (item.processList && item.processList.includes(process)) {
+                        const count = item.processStages[process] || 0;
+                        row[process] = count;
+                    } else {
+                        // 不在工艺路线中的显示为"-"
+                        row[process] = "-";
+                    }
                 });
                 
                 return row;
@@ -2680,7 +2701,7 @@
                 return;
             }
             
-            // 收集所有可能的工序名称
+            // 收集所有可能的工序名称，但只包含每个产品型号的工艺路线中的工序
             const allProcesses = new Set();
             statistics.forEach(item => {
                 if (item.processList) {
@@ -2717,10 +2738,20 @@
                 `;
                 
                 // 添加各工序状态，只显示数量不显示百分比
+                // 只显示该型号工艺路线中的工序
                 allProcesses.forEach(process => {
-                    const count = item.processStages[process] || 0;
                     const cell = document.createElement('td');
-                    cell.textContent = count;
+                    
+                    // 检查此工序是否在该型号的工艺路线中
+                    if (item.processList && item.processList.includes(process)) {
+                        const count = item.processStages[process] || 0;
+                        cell.textContent = count;
+                    } else {
+                        // 不在工艺路线中的显示为"-"
+                        cell.textContent = "-";
+                        cell.style.color = "#ccc";
+                    }
+                    
                     row.appendChild(cell);
                 });
                 
