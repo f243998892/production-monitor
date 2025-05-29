@@ -786,9 +786,9 @@
         async function fetchApiData(tables = ['modelSeries', 'seriesProcesses', 'products'], forceRefresh = false) {
             // API端点映射
             const apiMap = {
-                modelSeries: '/api/modelSeries',
-                seriesProcesses: '/api/seriesProcesses',
-                products: '/api/getProductDetailsAll' // 你需要在后端实现一个返回所有产品详情的接口
+                modelSeries: 'https://www.fanghui8131.fun/api/modelSeries',
+                seriesProcesses: 'https://www.fanghui8131.fun/api/seriesProcesses',
+                products: 'https://www.fanghui8131.fun/api/getProductDetailsAll' // 你需要在后端实现一个返回所有产品详情的接口
             };
             // 如果有缓存且未强制刷新，则使用缓存
             if (dataCache.lastFetch && !forceRefresh) {
