@@ -783,124 +783,46 @@
         };
 
         // 优化的数据获取函数，支持缓存和选择性获取
-        async function fetchSupabaseData(tables = ['modelSeries', 'seriesProcesses', 'products'], forceRefresh = false) {
-            const SUPABASE_URL = "https://mirilhunybcsydhtowqo.supabase.co";
-            const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1pcmlsaHVueWJjc3lkaHRvd3FvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDEyNjk3MzEsImV4cCI6MjA1Njg0NTczMX0.fQCOraXJXQFshRXxHf2N-VIwTSbEc1hrxXzHP4sIIAw";
-            const headers = {
-                'apikey': SUPABASE_KEY,
-                'Authorization': `Bearer ${SUPABASE_KEY}`
+        async function fetchApiData(tables = ['modelSeries', 'seriesProcesses', 'products'], forceRefresh = false) {
+            // API端点映射
+            const apiMap = {
+                modelSeries: '/api/modelSeries',
+                seriesProcesses: '/api/seriesProcesses',
+                products: '/api/getProductDetailsAll' // 你需要在后端实现一个返回所有产品详情的接口
             };
-            
             // 如果有缓存且未强制刷新，则使用缓存
             if (dataCache.lastFetch && !forceRefresh) {
-                console.log("使用缓存数据...");
-                
-                // 过滤出需要获取的表
                 const result = {};
                 tables.forEach(table => {
                     if (dataCache[table]) {
                         result[table] = dataCache[table];
                     }
                 });
-                
-                // 如果所有请求的表都有缓存，直接返回
                 if (Object.keys(result).length === tables.length) {
-                    console.log("所有请求的表都有缓存数据");
                     return result;
                 }
             }
-            
-            console.log("获取数据中...");
             const result = {};
-            
             try {
-                // 获取model_series数据
-                if (tables.includes('modelSeries') && (!dataCache.modelSeries || forceRefresh)) {
-                    console.log("获取model_series数据...");
-                    const modelSeriesResponse = await fetch(`${SUPABASE_URL}/rest/v1/model_series?select=*`, { headers });
-                    const modelSeries = await modelSeriesResponse.json();
-                    result.modelSeries = modelSeries;
-                    dataCache.modelSeries = modelSeries;
-                    console.log(`获取到${modelSeries?.length || 0}条model_series数据`);
-                } else if (tables.includes('modelSeries')) {
-                    result.modelSeries = dataCache.modelSeries;
+                if (tables.includes('modelSeries')) {
+                    const res = await fetch(apiMap.modelSeries);
+                    const json = await res.json();
+                    result.modelSeries = json.data || [];
+                    dataCache.modelSeries = result.modelSeries;
                 }
-                
-                // 获取series_processes数据
-                if (tables.includes('seriesProcesses') && (!dataCache.seriesProcesses || forceRefresh)) {
-                    console.log("获取series_processes数据...");
-                    const seriesProcessesResponse = await fetch(`${SUPABASE_URL}/rest/v1/series_processes?select=*`, { headers });
-                    const seriesProcesses = await seriesProcessesResponse.json();
-                    result.seriesProcesses = seriesProcesses;
-                    dataCache.seriesProcesses = seriesProcesses;
-                    console.log(`获取到${seriesProcesses?.length || 0}条series_processes数据`);
-                } else if (tables.includes('seriesProcesses')) {
-                    result.seriesProcesses = dataCache.seriesProcesses;
+                if (tables.includes('seriesProcesses')) {
+                    const res = await fetch(apiMap.seriesProcesses);
+                    const json = await res.json();
+                    result.seriesProcesses = json.data || [];
+                    dataCache.seriesProcesses = result.seriesProcesses;
                 }
-                
-                // 分页获取products数据
-                if (tables.includes('products') && (!dataCache.products || forceRefresh)) {
-                    console.log("获取products数据...");
-                    let allProducts = [];
-                    let page = 0;
-                    const pageSize = 1000;
-                    let hasMore = true;
-                    
-                    while (hasMore) {
-                        const offset = page * pageSize;
-                        console.log(`获取products数据，页码: ${page+1}，偏移量: ${offset}`);
-                        
-                        try {
-                            const productsResponse = await fetch(
-                                `${SUPABASE_URL}/rest/v1/products?select=*&limit=${pageSize}&offset=${offset}`, 
-                                { headers }
-                            );
-                            
-                            if (!productsResponse.ok) {
-                                throw new Error(`获取products失败: ${productsResponse.statusText}`);
-                            }
-                            
-                            const products = await productsResponse.json();
-                            
-                            if (products.length === 0) {
-                                hasMore = false;
-                            } else {
-                                allProducts = allProducts.concat(products);
-                                page++;
-                                // 显示进度提示
-                                document.getElementById('loading').textContent = `已加载 ${allProducts.length} 条产品数据...`;
-                            }
-                        } catch (error) {
-                            console.error(`获取products页码${page+1}失败:`, error);
-                            hasMore = false;
-                        }
-                    }
-                    
-                    console.log(`总共获取到 ${allProducts.length} 条产品数据`);
-                    result.products = allProducts;
-                    dataCache.products = allProducts;
-                } else if (tables.includes('products')) {
-                    result.products = dataCache.products;
+                if (tables.includes('products')) {
+                    const res = await fetch(apiMap.products);
+                    const json = await res.json();
+                    result.products = json.data || [];
+                    dataCache.products = result.products;
                 }
-                
-                // 更新最后获取时间
                 dataCache.lastFetch = new Date();
-                
-                // 添加缓存更新时间显示
-                if (dataCache.lastFetch && !forceRefresh) {
-                    const cacheTime = new Date(dataCache.lastFetch);
-                    const now = new Date();
-                    const diffMinutes = Math.floor((now - cacheTime) / (1000 * 60));
-                    
-                    updateCacheStatus(`使用${diffMinutes}分钟前的缓存数据`);
-                    
-                    // 如果缓存时间超过30分钟，提示用户刷新
-                    if (diffMinutes > 30) {
-                        console.log("缓存数据已超过30分钟，建议刷新");
-                        document.getElementById('cache-status').style.color = "#ff9800";
-                    }
-                }
-                
                 return result;
             } catch (error) {
                 console.error("获取数据失败:", error);
@@ -979,7 +901,7 @@
                     
                     // 获取所有需要的数据（只请求一次）
                     const { modelSeries, seriesProcesses, products } = 
-                        await fetchSupabaseData(['modelSeries', 'seriesProcesses', 'products'], forceRefresh);
+                        await fetchApiData(['modelSeries', 'seriesProcesses', 'products'], forceRefresh);
                     
                     if (!modelSeries || modelSeries.length === 0) {
                         throw new Error("没有获取到有效的model_series数据");
@@ -1736,7 +1658,7 @@
                 
                 // 确保产品数据已加载
                 if (!dataCache.products) {
-                    await fetchSupabaseData(['products']);
+                    await fetchApiData(['products']);
                 }
                 
                 // 访问全局缓存中的产品数据
@@ -2773,7 +2695,7 @@
             if (!dataCache.products || !dataCache.modelSeries || !dataCache.seriesProcesses) {
                 document.getElementById('loading').style.display = 'block';
                 document.getElementById('loading').textContent = "正在加载数据，请稍候...";
-                fetchSupabaseData(['products', 'modelSeries', 'seriesProcesses']).then(() => {
+                fetchApiData(['products', 'modelSeries', 'seriesProcesses']).then(() => {
                     document.getElementById('loading').style.display = 'none';
                     calculateDifficultyIndex();
                 });
@@ -3125,7 +3047,7 @@
             if (!dataCache.products) {
                 document.getElementById('loading').style.display = 'block';
                 document.getElementById('loading').textContent = "正在加载数据，请稍候...";
-                fetchSupabaseData(['products']).then(() => {
+                fetchApiData(['products']).then(() => {
                     document.getElementById('loading').style.display = 'none';
                     prepareTimingAnalysis();
                 });
